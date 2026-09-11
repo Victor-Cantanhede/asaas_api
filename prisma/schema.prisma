@@ -1,0 +1,96 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model Customer {
+  id              String   @id @default(uuid())
+  externalId      String   @unique @map("external_id")
+  asaasCustomerId String?  @unique @map("asaas_customer_id")
+  name            String
+  email           String
+  cpfCnpj         String?  @map("cpf_cnpj")
+  phone           String?
+  status          String   @default("RECEIVED") // RECEIVED | SYNCED | FAILED
+  failureReason   String?  @map("failure_reason")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  payments      Payment[]
+  subscriptions Subscription[]
+
+  @@index([status])
+  @@map("customers")
+}
+
+model Payment {
+  id                    String    @id @default(uuid())
+  customerId            String    @map("customer_id")
+  asaasPaymentId        String?   @unique @map("asaas_payment_id")
+  externalReference     String?   @map("external_reference")
+  billingType           String    @map("billing_type") // PIX | CREDIT_CARD
+  status                String    @default("RECEIVED") // RECEIVED | PROCESSING | PENDING | CONFIRMED | RECEIVED_IN_CASH | REFUNDED | FAILED
+  value                 Float
+  netValue              Float?    @map("net_value")
+  dueDate               DateTime? @map("due_date")
+  paymentDate           DateTime? @map("payment_date")
+  invoiceUrl            String?   @map("invoice_url")
+  pixQrCodeBase64       String?   @map("pix_qr_code_base64")
+  pixPayload            String?   @map("pix_payload")
+  pixExpirationDate     DateTime? @map("pix_expiration_date")
+  splitConfig           String?   @map("split_config")
+  failureReason         String?   @map("failure_reason")
+  createdAt             DateTime  @default(now()) @map("created_at")
+  updatedAt             DateTime  @updatedAt @map("updated_at")
+
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@index([status])
+  @@index([externalReference])
+  @@map("payments")
+}
+
+model Subscription {
+  id                  String    @id @default(uuid())
+  customerId          String    @map("customer_id")
+  asaasSubscriptionId String?   @unique @map("asaas_subscription_id")
+  externalReference   String?   @map("external_reference")
+  billingType         String    @default("CREDIT_CARD") @map("billing_type")
+  status              String    @default("RECEIVED") // RECEIVED | PROCESSING | ACTIVE | INACTIVE | FAILED
+  cycle               String    @default("MONTHLY")
+  value               Float
+  nextDueDate         DateTime? @map("next_due_date")
+  creditCardToken     String?   @map("credit_card_token")
+  creditCardBrand     String?   @map("credit_card_brand")
+  creditCardLast4     String?   @map("credit_card_last4")
+  failureReason       String?   @map("failure_reason")
+  createdAt           DateTime  @default(now()) @map("created_at")
+  updatedAt           DateTime  @updatedAt @map("updated_at")
+
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@index([status])
+  @@index([externalReference])
+  @@map("subscriptions")
+}
+
+model WebhookEvent {
+  id             String    @id @default(uuid())
+  eventId        String    @unique @map("event_id")
+  event          String
+  asaasPaymentId String?   @map("asaas_payment_id")
+  payload        String
+  processed      Boolean   @default(false)
+  forwardStatus  String?   @map("forward_status")
+  forwardError   String?   @map("forward_error")
+  processedAt    DateTime? @map("processed_at")
+  createdAt      DateTime  @default(now()) @map("created_at")
+
+  @@index([event])
+  @@index([asaasPaymentId])
+  @@map("webhook_events")
+}

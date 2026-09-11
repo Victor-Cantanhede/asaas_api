@@ -1,0 +1,78 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: asaas_postgres_prod
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:?Defina a variavel POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Defina a variavel POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-asaas_db}
+    volumes:
+      - postgres_prod_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:?Defina a variavel POSTGRES_USER} -d ${POSTGRES_DB:-asaas_db}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - asaas_network
+
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    container_name: asaas_rabbitmq_prod
+    restart: unless-stopped
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER:?Defina a variavel RABBITMQ_DEFAULT_USER}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS:?Defina a variavel RABBITMQ_DEFAULT_PASS}
+    volumes:
+      - rabbitmq_prod_data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - asaas_network
+
+  asaas-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: asaas_api_prod
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    ports:
+      - "${PORT:-5006}:5006"
+    environment:
+      - PORT=5006
+      - NODE_ENV=production
+      - API_KEY=${API_KEY:?Defina a variavel API_KEY}
+      - API_KEY_READ=${API_KEY_READ:-}
+      - API_KEY_PAYMENTS=${API_KEY_PAYMENTS:-}
+      - CARD_ENCRYPTION_KEY=${CARD_ENCRYPTION_KEY:-}
+      - SWAGGER_ENABLED=${SWAGGER_ENABLED:-false}
+      - SWAGGER_USER=${SWAGGER_USER:-}
+      - SWAGGER_PASSWORD=${SWAGGER_PASSWORD:-}
+      - ASAAS_API_KEY=${ASAAS_API_KEY:?Defina a variavel ASAAS_API_KEY}
+      - ASAAS_ENVIRONMENT=${ASAAS_ENVIRONMENT:-production}
+      - ASAAS_WEBHOOK_SECRET=${ASAAS_WEBHOOK_SECRET}
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-asaas_db}?schema=public
+      - RABBITMQ_URL=amqp://${RABBITMQ_DEFAULT_USER}:${RABBITMQ_DEFAULT_PASS}@rabbitmq:5672
+      - RABBITMQ_MAIN_QUEUE=${RABBITMQ_MAIN_QUEUE:-asaas_main_queue}
+      - RABBITMQ_DLQ_QUEUE=${RABBITMQ_DLQ_QUEUE:-asaas_dlq_queue}
+      - CLIENT_WEBHOOK_URL=${CLIENT_WEBHOOK_URL}
+      - CLIENT_WEBHOOK_SECRET=${CLIENT_WEBHOOK_SECRET}
+    networks:
+      - asaas_network
+
+networks:
+  asaas_network:
+    driver: bridge
+
+volumes:
+  postgres_prod_data:
+  rabbitmq_prod_data:
