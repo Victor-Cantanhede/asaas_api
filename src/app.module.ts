@@ -10,6 +10,7 @@ import { CustomerModule } from './modules/customer/customer.module';
 import { PaymentModule } from './modules/payment/payment.module';
 import { SubscriptionModule } from './modules/subscription/subscription.module';
 import { WebhookModule } from './modules/webhook/webhook.module';
+import { SubaccountModule } from './modules/subaccount/subaccount.module';
 
 @Module({
   imports: [
@@ -26,6 +27,7 @@ import { WebhookModule } from './modules/webhook/webhook.module';
     PaymentModule,
     SubscriptionModule,
     WebhookModule,
+    SubaccountModule,
   ],
 })
 export class AppModule {}

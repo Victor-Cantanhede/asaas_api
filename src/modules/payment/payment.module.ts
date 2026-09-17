@@ -8,10 +8,18 @@ import { GetPaymentUseCase } from './use-cases/get-payment.use-case';
 import { PAYMENT_REPOSITORY_TOKEN } from './repositories/payment.repository.interface';
 import { PrismaPaymentRepository } from './repositories/prisma-payment.repository';
 import { CustomerModule } from '../customer/customer.module';
+import { SubaccountModule } from '../subaccount/subaccount.module';
+import { PaymentEscrowConsumer } from './consumers/payment-escrow.consumer';
+import { ProcessReleaseEscrowUseCase } from './use-cases/process-release-escrow.use-case';
 
 @Module({
-  imports: [CustomerModule],
-  controllers: [PaymentController, PaymentPixConsumer, PaymentCreditCardConsumer],
+  imports: [CustomerModule, SubaccountModule],
+  controllers: [
+    PaymentController,
+    PaymentPixConsumer,
+    PaymentCreditCardConsumer,
+    PaymentEscrowConsumer,
+  ],
   providers: [
     {
       provide: PAYMENT_REPOSITORY_TOKEN,
@@ -19,12 +27,14 @@ import { CustomerModule } from '../customer/customer.module';
     },
     ProcessPixPaymentUseCase,
     ProcessCreditCardPaymentUseCase,
+    ProcessReleaseEscrowUseCase,
     GetPaymentUseCase,
   ],
   exports: [
     PAYMENT_REPOSITORY_TOKEN,
     ProcessPixPaymentUseCase,
     ProcessCreditCardPaymentUseCase,
+    ProcessReleaseEscrowUseCase,
     GetPaymentUseCase,
   ],
 })

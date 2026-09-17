@@ -5,12 +5,14 @@ import { CUSTOMER_REPOSITORY_TOKEN } from '../../customer/repositories/customer.
 import { SyncCustomerUseCase } from '../../customer/use-cases/sync-customer.use-case';
 import { AsaasClientProvider } from '../../../infra/asaas/asaas-client.provider';
 import { EVENT_PUBLISHER_TOKEN } from '../../../infra/messaging/contracts/event-publisher.interface';
+import { SUBACCOUNT_REPOSITORY_TOKEN } from '../../subaccount/repositories/subaccount.repository.interface';
 import { AsaasBadRequestException, AsaasGatewayException } from '../../../infra/asaas/errors';
 
 describe('ProcessCreditCardPaymentUseCase', () => {
   let useCase: ProcessCreditCardPaymentUseCase;
   let paymentRepositoryMock: any;
   let customerRepositoryMock: any;
+  let subaccountRepositoryMock: any;
   let syncCustomerUseCaseMock: any;
   let asaasClientMock: any;
   let eventPublisherMock: any;
@@ -24,6 +26,10 @@ describe('ProcessCreditCardPaymentUseCase', () => {
 
     customerRepositoryMock = {
       findById: jest.fn(),
+    };
+
+    subaccountRepositoryMock = {
+      findByExternalId: jest.fn(),
     };
 
     syncCustomerUseCaseMock = {
@@ -48,6 +54,10 @@ describe('ProcessCreditCardPaymentUseCase', () => {
         {
           provide: CUSTOMER_REPOSITORY_TOKEN,
           useValue: customerRepositoryMock,
+        },
+        {
+          provide: SUBACCOUNT_REPOSITORY_TOKEN,
+          useValue: subaccountRepositoryMock,
         },
         {
           provide: SyncCustomerUseCase,
@@ -141,6 +151,10 @@ describe('ProcessCreditCardPaymentUseCase', () => {
       status: 'CONFIRMED',
       netValue: 288.5,
       invoiceUrl: 'https://sandbox.asaas.com/i/cc999',
+      escrowStatus: 'NONE',
+      creditCardToken: 'token_generated_uuid',
+      creditCardBrand: 'VISA',
+      creditCardLast4: '1111',
       failureReason: null,
     });
 
@@ -332,4 +346,260 @@ describe('ProcessCreditCardPaymentUseCase', () => {
       expect.stringContaining('Connection timed out'),
     );
   });
+
+  it('should resolve subaccountExternalId in splitConfig and save escrow and card token data', async () => {
+    const splitConfig = JSON.stringify([
+      { subaccountExternalId: 'freelancer_vendor_88', percentualValue: 80.0 },
+    ]);
+
+    const payment = {
+      id: 'pay_cc_split',
+      customerId: 'cust_cc_split',
+      value: 500.0,
+      dueDate: null,
+      externalReference: 'job_order_500',
+      splitConfig,
+    };
+
+    const customer = {
+      id: 'cust_cc_split',
+      externalId: 'ext_cust_cc',
+      asaasCustomerId: 'cus_asaas_cc',
+    };
+
+    paymentRepositoryMock.findById.mockResolvedValue(payment);
+    customerRepositoryMock.findById.mockResolvedValue(customer);
+    subaccountRepositoryMock.findByExternalId.mockResolvedValue({
+      id: 'subacc_88',
+      externalId: 'freelancer_vendor_88',
+      walletId: 'wallet_resolved_88',
+    });
+
+    asaasClientMock.post.mockResolvedValue({
+      id: 'pay_asaas_cc_88',
+      status: 'CONFIRMED',
+      netValue: 485.0,
+      escrow: { status: 'ACTIVE' },
+      creditCard: {
+        creditCardToken: 'token_new_gen_88',
+        creditCardBrand: 'MASTERCARD',
+        creditCardNumber: '5555',
+      },
+    });
+
+    const input = {
+      paymentId: 'pay_cc_split',
+      remoteIp: '187.12.34.56',
+      creditCardToken: 'token_incoming',
+    };
+
+    await useCase.execute(input);
+
+    expect(subaccountRepositoryMock.findByExternalId).toHaveBeenCalledWith('freelancer_vendor_88');
+    expect(asaasClientMock.post).toHaveBeenCalledWith(
+      '/v3/payments',
+      expect.objectContaining({
+        split: [{ walletId: 'wallet_resolved_88', percentualValue: 80.0 }],
+      }),
+    );
+    expect(paymentRepositoryMock.update).toHaveBeenCalledWith(
+      'pay_cc_split',
+      expect.objectContaining({
+        escrowStatus: 'ACTIVE',
+        creditCardToken: 'token_new_gen_88',
+        creditCardBrand: 'MASTERCARD',
+        creditCardLast4: '5555',
+      }),
+    );
+  });
+
+  describe('Edge Cases & Reliability Hardening', () => {
+    it('should return early without calling Asaas if payment is not found', async () => {
+      paymentRepositoryMock.findById.mockResolvedValue(null);
+
+      await expect(
+        useCase.execute({
+          paymentId: 'pay_missing',
+          remoteIp: '1.1.1.1',
+          creditCardToken: 'tok_1',
+        }),
+      ).resolves.not.toThrow();
+
+      expect(customerRepositoryMock.findById).not.toHaveBeenCalled();
+      expect(asaasClientMock.post).not.toHaveBeenCalled();
+      expect(paymentRepositoryMock.updateStatus).not.toHaveBeenCalled();
+    });
+
+    it('should mark payment as FAILED if customer is not found in repository', async () => {
+      const payment = {
+        id: 'pay_no_cust',
+        customerId: 'cust_ghost',
+      };
+      paymentRepositoryMock.findById.mockResolvedValue(payment);
+      customerRepositoryMock.findById.mockResolvedValue(null);
+
+      await useCase.execute({
+        paymentId: 'pay_no_cust',
+        remoteIp: '1.1.1.1',
+        creditCardToken: 'tok_1',
+      });
+
+      expect(paymentRepositoryMock.updateStatus).toHaveBeenCalledWith(
+        'pay_no_cust',
+        'FAILED',
+        'Cliente associado ao pagamento não localizado',
+      );
+      expect(asaasClientMock.post).not.toHaveBeenCalled();
+    });
+
+    it('should sync customer when asaasCustomerId is missing and proceed with charge', async () => {
+      const payment = {
+        id: 'pay_sync_cust',
+        customerId: 'cust_needs_sync',
+        value: 150.0,
+        dueDate: null,
+      };
+
+      const custBeforeSync = {
+        id: 'cust_needs_sync',
+        externalId: 'ext_sync_cc',
+        asaasCustomerId: null,
+      };
+
+      const custAfterSync = {
+        id: 'cust_needs_sync',
+        externalId: 'ext_sync_cc',
+        asaasCustomerId: 'cus_synced_now_77',
+      };
+
+      paymentRepositoryMock.findById.mockResolvedValue(payment);
+      customerRepositoryMock.findById
+        .mockResolvedValueOnce(custBeforeSync)
+        .mockResolvedValueOnce(custAfterSync);
+
+      asaasClientMock.post.mockResolvedValue({
+        id: 'pay_asaas_after_sync',
+        status: 'CONFIRMED',
+      });
+
+      await useCase.execute({
+        paymentId: 'pay_sync_cust',
+        remoteIp: '1.2.3.4',
+        creditCardToken: 'tok_sync',
+      });
+
+      expect(syncCustomerUseCaseMock.execute).toHaveBeenCalledWith({
+        customerId: 'cust_needs_sync',
+        externalId: 'ext_sync_cc',
+      });
+      expect(asaasClientMock.post).toHaveBeenCalledWith(
+        '/v3/payments',
+        expect.objectContaining({
+          customer: 'cus_synced_now_77',
+        }),
+      );
+    });
+
+    it('should mark payment as FAILED if customer sync does not yield asaasCustomerId', async () => {
+      const payment = {
+        id: 'pay_sync_failed',
+        customerId: 'cust_broken',
+      };
+
+      const custWithoutAsaas = {
+        id: 'cust_broken',
+        externalId: 'ext_broken',
+        asaasCustomerId: null,
+      };
+
+      paymentRepositoryMock.findById.mockResolvedValue(payment);
+      customerRepositoryMock.findById.mockResolvedValue(custWithoutAsaas);
+
+      await useCase.execute({
+        paymentId: 'pay_sync_failed',
+        remoteIp: '1.2.3.4',
+        creditCardToken: 'tok_fail',
+      });
+
+      expect(syncCustomerUseCaseMock.execute).toHaveBeenCalled();
+      expect(paymentRepositoryMock.updateStatus).toHaveBeenCalledWith(
+        'pay_sync_failed',
+        'FAILED',
+        'Não foi possível sincronizar o cliente no Asaas',
+      );
+      expect(asaasClientMock.post).not.toHaveBeenCalled();
+    });
+
+    it('should gracefully continue when splitConfig contains malformed JSON without crashing', async () => {
+      const payment = {
+        id: 'pay_malformed_split',
+        customerId: 'cust_valid',
+        value: 200.0,
+        dueDate: null,
+        splitConfig: '{ invalid: json: [ ] }',
+      };
+
+      const customer = {
+        id: 'cust_valid',
+        asaasCustomerId: 'cus_valid_123',
+      };
+
+      paymentRepositoryMock.findById.mockResolvedValue(payment);
+      customerRepositoryMock.findById.mockResolvedValue(customer);
+      asaasClientMock.post.mockResolvedValue({
+        id: 'pay_asaas_ok',
+        status: 'CONFIRMED',
+      });
+
+      await useCase.execute({
+        paymentId: 'pay_malformed_split',
+        remoteIp: '1.2.3.4',
+        creditCardToken: 'tok_ok',
+      });
+
+      expect(asaasClientMock.post).toHaveBeenCalledWith(
+        '/v3/payments',
+        expect.not.objectContaining({
+          split: expect.anything(),
+        }),
+      );
+    });
+
+    it('should accurately calculate installment value for fractional amounts (e.g. 100 in 3x = 33.33)', async () => {
+      const payment = {
+        id: 'pay_installment_calc',
+        customerId: 'cust_inst',
+        value: 100.0,
+        dueDate: null,
+      };
+
+      const customer = {
+        id: 'cust_inst',
+        asaasCustomerId: 'cus_inst_123',
+      };
+
+      paymentRepositoryMock.findById.mockResolvedValue(payment);
+      customerRepositoryMock.findById.mockResolvedValue(customer);
+      asaasClientMock.post.mockResolvedValue({
+        id: 'pay_asaas_inst',
+        status: 'CONFIRMED',
+      });
+
+      await useCase.execute({
+        paymentId: 'pay_installment_calc',
+        remoteIp: '1.2.3.4',
+        creditCardToken: 'tok_inst',
+        installmentCount: 3,
+      });
+
+      expect(asaasClientMock.post).toHaveBeenCalledWith(
+        '/v3/payments',
+        expect.objectContaining({
+          installmentCount: 3,
+          installmentValue: 33.33,
+        }),
+      );
+    });
+  });
 });
+

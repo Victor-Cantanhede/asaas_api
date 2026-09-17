@@ -69,6 +69,17 @@ export class ProcessAsaasWebhookUseCase {
             updateData.paymentDate = new Date(payload.payment.paymentDate);
           }
 
+          if ((payload.payment as any)?.escrow?.status) {
+            updateData.escrowStatus = (payload.payment as any).escrow.status;
+          } else if (payload.event === 'ESCROW_FINISHED') {
+            updateData.escrowStatus = 'FINISHED';
+            updateData.escrowFinishDate = new Date();
+          }
+
+          if ((payload.payment as any)?.escrow?.finishDate) {
+            updateData.escrowFinishDate = new Date((payload.payment as any).escrow.finishDate);
+          }
+
           await this.paymentRepository.update(payment.id, updateData);
           this.logger.log(`Pagamento local ${payment.id} atualizado pelo webhook ${payload.event}`);
         }

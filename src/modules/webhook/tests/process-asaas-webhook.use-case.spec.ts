@@ -124,4 +124,32 @@ describe('ProcessAsaasWebhookUseCase', () => {
     });
     expect(webhookEventRepoMock.markProcessed).toHaveBeenCalledWith('wh_evt_1');
   });
+
+  it('should update payment escrow status when webhook contains escrow data or ESCROW_FINISHED event', async () => {
+    webhookEventRepoMock.findByEventId.mockResolvedValue(null);
+    paymentRepoMock.findByAsaasPaymentId.mockResolvedValue({ id: 'pay_local_escrow' });
+
+    const payload = {
+      id: 'evt_escrow_1',
+      event: 'ESCROW_FINISHED',
+      payment: {
+        id: 'pay_asaas_escrow',
+        escrow: {
+          status: 'FINISHED',
+          finishDate: '2026-09-17T18:00:00.000Z',
+        },
+      },
+    };
+
+    const result = await useCase.execute(payload as any);
+
+    expect(result.isDuplicate).toBe(false);
+    expect(paymentRepoMock.update).toHaveBeenCalledWith(
+      'pay_local_escrow',
+      expect.objectContaining({
+        escrowStatus: 'FINISHED',
+        escrowFinishDate: new Date('2026-09-17T18:00:00.000Z'),
+      }),
+    );
+  });
 });

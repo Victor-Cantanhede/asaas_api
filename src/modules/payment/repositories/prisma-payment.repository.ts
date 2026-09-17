@@ -16,6 +16,14 @@ export class PrismaPaymentRepository implements IPaymentRepository {
     });
   }
 
+  async findByExternalReference(
+    externalReference: string,
+  ): Promise<Payment | null> {
+    return this.prisma.payment.findFirst({
+      where: { externalReference },
+    });
+  }
+
   async findByAsaasPaymentId(asaasPaymentId: string): Promise<Payment | null> {
     return this.prisma.payment.findUnique({
       where: { asaasPaymentId },

@@ -43,6 +43,11 @@ model Payment {
   pixPayload            String?   @map("pix_payload")
   pixExpirationDate     DateTime? @map("pix_expiration_date")
   splitConfig           String?   @map("split_config")
+  escrowStatus          String?   @map("escrow_status") // NONE | ACTIVE | FINISHED | EXPIRED
+  escrowFinishDate      DateTime? @map("escrow_finish_date")
+  creditCardToken       String?   @map("credit_card_token")
+  creditCardBrand       String?   @map("credit_card_brand")
+  creditCardLast4       String?   @map("credit_card_last4")
   failureReason         String?   @map("failure_reason")
   createdAt             DateTime  @default(now()) @map("created_at")
   updatedAt             DateTime  @updatedAt @map("updated_at")
@@ -93,4 +98,31 @@ model WebhookEvent {
   @@index([event])
   @@index([asaasPaymentId])
   @@map("webhook_events")
+}
+
+model Subaccount {
+  id                  String   @id @default(uuid())
+  externalId          String   @unique @map("external_id")
+  asaasAccountId      String?  @unique @map("asaas_account_id")
+  walletId            String?  @unique @map("wallet_id")
+  name                String
+  email               String
+  cpfCnpj             String   @map("cpf_cnpj")
+  phone               String?
+  mobilePhone         String?  @map("mobile_phone")
+  incomeValue         Float?   @map("income_value")
+  address             String?
+  addressNumber       String?  @map("address_number")
+  province            String?
+  postalCode          String?  @map("postal_code")
+  companyType         String?  @map("company_type") // MEI | LIMITED | INDIVIDUAL | ASSOCIATION
+  escrowEnabled       Boolean  @default(false) @map("escrow_enabled")
+  escrowDaysToExpire  Int?     @map("escrow_days_to_expire")
+  status              String   @default("RECEIVED") // RECEIVED | SYNCED | FAILED
+  failureReason       String?  @map("failure_reason")
+  createdAt           DateTime @default(now()) @map("created_at")
+  updatedAt           DateTime @updatedAt @map("updated_at")
+
+  @@index([status])
+  @@map("subaccounts")
 }

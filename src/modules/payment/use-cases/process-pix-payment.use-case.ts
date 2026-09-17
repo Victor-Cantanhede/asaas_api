@@ -1,4 +1,4 @@
-import { Injectable, Inject, Logger } from '@nestjs/common';
+import { Injectable, Inject, Logger, Optional } from '@nestjs/common';
 import {
   PAYMENT_REPOSITORY_TOKEN,
   IPaymentRepository,
@@ -7,6 +7,10 @@ import {
   CUSTOMER_REPOSITORY_TOKEN,
   ICustomerRepository,
 } from '../../customer/repositories/customer.repository.interface';
+import {
+  SUBACCOUNT_REPOSITORY_TOKEN,
+  ISubaccountRepository,
+} from '../../subaccount/repositories/subaccount.repository.interface';
 import { SyncCustomerUseCase } from '../../customer/use-cases/sync-customer.use-case';
 import { AsaasClientProvider } from '../../../infra/asaas/asaas-client.provider';
 import { AsaasBadRequestException } from '../../../infra/asaas/errors';
@@ -33,6 +37,9 @@ export class ProcessPixPaymentUseCase {
     private readonly asaasClient: AsaasClientProvider,
     @Inject(EVENT_PUBLISHER_TOKEN)
     private readonly eventPublisher: IEventPublisher,
+    @Optional()
+    @Inject(SUBACCOUNT_REPOSITORY_TOKEN)
+    private readonly subaccountRepository?: ISubaccountRepository,
   ) {}
 
   async execute(input: ProcessPixPaymentInput): Promise<void> {
@@ -89,9 +96,36 @@ export class ProcessPixPaymentUseCase {
         payload.externalReference = payment.externalReference;
       }
 
+      // DX: Resolução de split por subaccountExternalId ou walletId
       if (payment.splitConfig) {
         try {
-          payload.split = JSON.parse(payment.splitConfig);
+          const rawSplit = JSON.parse(payment.splitConfig);
+          if (Array.isArray(rawSplit)) {
+            const resolvedSplit = await Promise.all(
+              rawSplit.map(async (item: any) => {
+                let targetWalletId = item.walletId;
+                if (
+                  !targetWalletId &&
+                  item.subaccountExternalId &&
+                  this.subaccountRepository
+                ) {
+                  const subacc = await this.subaccountRepository.findByExternalId(
+                    item.subaccountExternalId,
+                  );
+                  if (subacc?.walletId) {
+                    targetWalletId = subacc.walletId;
+                  }
+                }
+                const splitItem: any = { walletId: targetWalletId };
+                if (item.fixedValue !== undefined) splitItem.fixedValue = item.fixedValue;
+                if (item.percentualValue !== undefined)
+                  splitItem.percentualValue = item.percentualValue;
+                if (item.description !== undefined) splitItem.description = item.description;
+                return splitItem;
+              }),
+            );
+            payload.split = resolvedSplit;
+          }
         } catch {
           this.logger.warn(`Erro ao parsear splitConfig para pagamento ${payment.id}`);
         }
@@ -120,6 +154,10 @@ export class ProcessPixPaymentUseCase {
         );
       }
 
+      const escrowStatus =
+        asaasPayment.escrow?.status ??
+        (payment.splitConfig ? 'ACTIVE' : 'NONE');
+
       // 5. Atualiza o pagamento local com dados completos
       await this.paymentRepository.update(payment.id, {
         asaasPaymentId: asaasPayment.id,
@@ -129,6 +167,7 @@ export class ProcessPixPaymentUseCase {
         pixQrCodeBase64,
         pixPayload,
         pixExpirationDate,
+        escrowStatus,
         failureReason: null,
       });
 
@@ -143,6 +182,7 @@ export class ProcessPixPaymentUseCase {
           billingType: 'PIX',
           externalReference: payment.externalReference,
           pixPayload,
+          escrowStatus,
         },
       });
 

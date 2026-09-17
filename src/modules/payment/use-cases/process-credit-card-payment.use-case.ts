@@ -1,4 +1,4 @@
-import { Injectable, Inject, Logger } from '@nestjs/common';
+import { Injectable, Inject, Logger, Optional } from '@nestjs/common';
 import {
   PAYMENT_REPOSITORY_TOKEN,
   IPaymentRepository,
@@ -7,6 +7,10 @@ import {
   CUSTOMER_REPOSITORY_TOKEN,
   ICustomerRepository,
 } from '../../customer/repositories/customer.repository.interface';
+import {
+  SUBACCOUNT_REPOSITORY_TOKEN,
+  ISubaccountRepository,
+} from '../../subaccount/repositories/subaccount.repository.interface';
 import { SyncCustomerUseCase } from '../../customer/use-cases/sync-customer.use-case';
 import { AsaasClientProvider } from '../../../infra/asaas/asaas-client.provider';
 import { AsaasBadRequestException } from '../../../infra/asaas/errors';
@@ -41,6 +45,9 @@ export class ProcessCreditCardPaymentUseCase {
     private readonly asaasClient: AsaasClientProvider,
     @Inject(EVENT_PUBLISHER_TOKEN)
     private readonly eventPublisher: IEventPublisher,
+    @Optional()
+    @Inject(SUBACCOUNT_REPOSITORY_TOKEN)
+    private readonly subaccountRepository?: ISubaccountRepository,
   ) {}
 
   async execute(input: ProcessCreditCardPaymentInput): Promise<void> {
@@ -111,9 +118,36 @@ export class ProcessCreditCardPaymentUseCase {
         }
       }
 
+      // DX: Resolução de split por subaccountExternalId ou walletId
       if (payment.splitConfig) {
         try {
-          payload.split = JSON.parse(payment.splitConfig);
+          const rawSplit = JSON.parse(payment.splitConfig);
+          if (Array.isArray(rawSplit)) {
+            const resolvedSplit = await Promise.all(
+              rawSplit.map(async (item: any) => {
+                let targetWalletId = item.walletId;
+                if (
+                  !targetWalletId &&
+                  item.subaccountExternalId &&
+                  this.subaccountRepository
+                ) {
+                  const subacc = await this.subaccountRepository.findByExternalId(
+                    item.subaccountExternalId,
+                  );
+                  if (subacc?.walletId) {
+                    targetWalletId = subacc.walletId;
+                  }
+                }
+                const splitItem: any = { walletId: targetWalletId };
+                if (item.fixedValue !== undefined) splitItem.fixedValue = item.fixedValue;
+                if (item.percentualValue !== undefined)
+                  splitItem.percentualValue = item.percentualValue;
+                if (item.description !== undefined) splitItem.description = item.description;
+                return splitItem;
+              }),
+            );
+            payload.split = resolvedSplit;
+          }
         } catch {
           this.logger.warn(`Split inválido no pagamento ${payment.id}`);
         }
@@ -121,11 +155,20 @@ export class ProcessCreditCardPaymentUseCase {
 
       const asaasPayment = await this.asaasClient.post<any>('/v3/payments', payload);
 
+      const escrowStatus =
+        asaasPayment.escrow?.status ??
+        (payment.splitConfig ? 'ACTIVE' : 'NONE');
+
       await this.paymentRepository.update(payment.id, {
         asaasPaymentId: asaasPayment.id,
         status: asaasPayment.status || 'CONFIRMED',
         netValue: asaasPayment.netValue ?? null,
         invoiceUrl: asaasPayment.invoiceUrl ?? null,
+        escrowStatus,
+        creditCardToken:
+          asaasPayment.creditCard?.creditCardToken ?? input.creditCardToken ?? null,
+        creditCardBrand: asaasPayment.creditCard?.creditCardBrand ?? null,
+        creditCardLast4: asaasPayment.creditCard?.creditCardNumber ?? null,
         failureReason: null,
       });
 
@@ -137,6 +180,7 @@ export class ProcessCreditCardPaymentUseCase {
           status: asaasPayment.status || 'CONFIRMED',
           value: payment.value,
           billingType: 'CREDIT_CARD',
+          escrowStatus,
           creditCard: asaasPayment.creditCard,
         },
       });

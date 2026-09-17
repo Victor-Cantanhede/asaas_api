@@ -60,6 +60,42 @@ export class PaymentDetailsResponseDto {
   @ApiPropertyOptional({ example: '2026-09-15T23:59:59.000Z', nullable: true })
   pixExpirationDate?: Date | null;
 
+  @ApiPropertyOptional({
+    description: 'Status da custódia (Conta Escrow) para pagamentos com split sob garantia',
+    example: 'ACTIVE',
+    enum: ['ACTIVE', 'FINISHED', 'EXPIRED', 'NONE'],
+    nullable: true,
+  })
+  escrowStatus?: string | null;
+
+  @ApiPropertyOptional({
+    description: 'Data em que a garantia de custódia foi encerrada / liberada',
+    example: '2026-09-17T15:00:00.000Z',
+    nullable: true,
+  })
+  escrowFinishDate?: Date | null;
+
+  @ApiPropertyOptional({
+    description: 'Token reutilizável do cartão gerado pelo Asaas',
+    example: '3673f47e-7517-4852-a548-5221081a9fd2',
+    nullable: true,
+  })
+  creditCardToken?: string | null;
+
+  @ApiPropertyOptional({
+    description: 'Bandeira do cartão de crédito',
+    example: 'VISA',
+    nullable: true,
+  })
+  creditCardBrand?: string | null;
+
+  @ApiPropertyOptional({
+    description: 'Últimos 4 dígitos do cartão',
+    example: '1111',
+    nullable: true,
+  })
+  creditCardLast4?: string | null;
+
   @ApiPropertyOptional({ example: null, nullable: true })
   failureReason?: string | null;
 

@@ -209,4 +209,81 @@ export class PaymentController {
   ): Promise<PaymentDetailsResponseDto> {
     return this.getPaymentUseCase.execute(id);
   }
+
+  @Post(':id/escrow/release')
+  @RequireScopes(ApiScope.PAYMENTS, ApiScope.WRITE, ApiScope.ADMIN)
+  @HttpCode(HttpStatus.ACCEPTED)
+  @ApiOperation({
+    summary: 'Comando assíncrono para liberação de garantia (Escrow) de cobrança',
+    description:
+      'Enfileira o evento "payment.release_escrow" no RabbitMQ para encerrar a custódia no Asaas e liberar os valores da subconta, retornando imediatamente HTTP 202. O parâmetro :id aceita tanto o UUID local do pagamento quanto o externalReference.',
+  })
+  @ApiParam({
+    name: 'id',
+    description: 'UUID da cobrança local ou externalReference associado',
+    example: 'b1b7029b-98b7-4f6c-8463-b8c73229b011',
+  })
+  @ApiResponse({
+    status: HttpStatus.ACCEPTED,
+    description: 'Comando de liberação de custódia enfileirado com sucesso',
+    type: AsyncCommandTrackingDto,
+  })
+  async releaseEscrow(
+    @Param('id') id: string,
+  ): Promise<AsyncCommandTrackingDto> {
+    let payment = await this.paymentRepository.findById(id);
+    if (!payment) {
+      payment = await this.paymentRepository.findByExternalReference(id);
+    }
+
+    if (!payment) {
+      throw new NotFoundException(`Cobrança "${id}" não encontrada no sistema local`);
+    }
+
+    await this.eventPublisher.publish(EVENT_PATTERNS.PAYMENT_RELEASE_ESCROW, {
+      paymentId: payment.id,
+    });
+
+    return {
+      trackingId: payment.id,
+      status: payment.status,
+      message: 'Solicitação de liberação de custódia (Escrow) enfileirada com sucesso.',
+      createdAt: new Date().toISOString(),
+      checkStatusUrl: `/payments/${payment.id}`,
+    };
+  }
+
+  @Get(':id/escrow')
+  @RequireScopes(ApiScope.READ)
+  @ApiOperation({
+    summary: 'Consulta síncrona do status de custódia (Escrow) da cobrança',
+    description:
+      'Retorna o status atual da garantia (ACTIVE, FINISHED, EXPIRED ou NONE) e a data de encerramento.',
+  })
+  @ApiParam({
+    name: 'id',
+    description: 'UUID do pagamento na API local ou externalReference',
+    example: 'b1b7029b-98b7-4f6c-8463-b8c73229b011',
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Status de custódia da cobrança retornado com sucesso',
+  })
+  async getEscrowStatus(@Param('id') id: string) {
+    let payment = await this.paymentRepository.findById(id);
+    if (!payment) {
+      payment = await this.paymentRepository.findByExternalReference(id);
+    }
+
+    if (!payment) {
+      throw new NotFoundException(`Cobrança "${id}" não encontrada no sistema local`);
+    }
+
+    return {
+      paymentId: payment.id,
+      externalReference: payment.externalReference,
+      escrowStatus: payment.escrowStatus || 'NONE',
+      escrowFinishDate: payment.escrowFinishDate,
+    };
+  }
 }

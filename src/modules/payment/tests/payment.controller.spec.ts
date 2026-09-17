@@ -21,6 +21,8 @@ describe('PaymentController (PIX)', () => {
         status: 'RECEIVED',
         createdAt: new Date('2026-09-10T15:30:00.000Z'),
       }),
+      findById: jest.fn(),
+      findByExternalReference: jest.fn(),
     };
 
     customerRepositoryMock = {
@@ -221,5 +223,79 @@ describe('PaymentController (PIX)', () => {
       }),
     );
   });
+
+  describe('Escrow endpoints', () => {
+    it('POST /payments/:id/escrow/release - should enqueue release by payment UUID and return 202', async () => {
+      paymentRepositoryMock.findById.mockResolvedValue({
+        id: 'pay_uuid_10',
+        status: 'CONFIRMED',
+      });
+
+      const response = await controller.releaseEscrow('pay_uuid_10');
+
+      expect(paymentRepositoryMock.findById).toHaveBeenCalledWith('pay_uuid_10');
+      expect(eventPublisherMock.publish).toHaveBeenCalledWith('payment.release_escrow', {
+        paymentId: 'pay_uuid_10',
+      });
+      expect(response.trackingId).toBe('pay_uuid_10');
+      expect(response.status).toBe('CONFIRMED');
+      expect(response.message).toContain('Escrow');
+    });
+
+    it('POST /payments/:id/escrow/release - should find by externalReference when UUID lookup fails', async () => {
+      paymentRepositoryMock.findById.mockResolvedValue(null);
+      paymentRepositoryMock.findByExternalReference.mockResolvedValue({
+        id: 'pay_uuid_20',
+        externalReference: 'order_ref_999',
+        status: 'CONFIRMED',
+      });
+
+      const response = await controller.releaseEscrow('order_ref_999');
+
+      expect(paymentRepositoryMock.findById).toHaveBeenCalledWith('order_ref_999');
+      expect(paymentRepositoryMock.findByExternalReference).toHaveBeenCalledWith('order_ref_999');
+      expect(eventPublisherMock.publish).toHaveBeenCalledWith('payment.release_escrow', {
+        paymentId: 'pay_uuid_20',
+      });
+      expect(response.trackingId).toBe('pay_uuid_20');
+    });
+
+    it('POST /payments/:id/escrow/release - should throw NotFoundException when payment is not found', async () => {
+      paymentRepositoryMock.findById.mockResolvedValue(null);
+      paymentRepositoryMock.findByExternalReference.mockResolvedValue(null);
+
+      await expect(controller.releaseEscrow('invalid_id')).rejects.toThrow(
+        NotFoundException,
+      );
+    });
+
+    it('GET /payments/:id/escrow - should return escrow status successfully', async () => {
+      paymentRepositoryMock.findById.mockResolvedValue({
+        id: 'pay_uuid_30',
+        externalReference: 'order_30',
+        escrowStatus: 'ACTIVE',
+        escrowFinishDate: null,
+      });
+
+      const result = await controller.getEscrowStatus('pay_uuid_30');
+
+      expect(result).toEqual({
+        paymentId: 'pay_uuid_30',
+        externalReference: 'order_30',
+        escrowStatus: 'ACTIVE',
+        escrowFinishDate: null,
+      });
+    });
+
+    it('GET /payments/:id/escrow - should throw NotFoundException when payment is not found', async () => {
+      paymentRepositoryMock.findById.mockResolvedValue(null);
+      paymentRepositoryMock.findByExternalReference.mockResolvedValue(null);
+
+      await expect(controller.getEscrowStatus('invalid_id')).rejects.toThrow(
+        NotFoundException,
+      );
+    });
+  });
 });
+
 

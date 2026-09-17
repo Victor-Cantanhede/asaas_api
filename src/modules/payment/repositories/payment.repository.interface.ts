@@ -11,6 +11,7 @@ export interface CreatePaymentData {
 
 export interface IPaymentRepository {
   findById(id: string): Promise<Payment | null>;
+  findByExternalReference(externalReference: string): Promise<Payment | null>;
   findByAsaasPaymentId(asaasPaymentId: string): Promise<Payment | null>;
   createInitial(data: CreatePaymentData): Promise<Payment>;
   update(id: string, data: Partial<Payment>): Promise<Payment>;

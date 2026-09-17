@@ -1,12 +1,24 @@
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsNotEmpty, IsNumber, IsOptional, IsPositive, IsString, Max, Min } from 'class-validator';
+import { ApiPropertyOptional } from '@nestjs/swagger';
+import { IsNumber, IsOptional, IsPositive, IsString, Max, Min } from 'class-validator';
 import { IsSafeText } from '../../../infra/security/validators/is-safe-text.decorator';
 
 export class PaymentSplitDto {
-  @ApiProperty({ description: 'ID da carteira Asaas destino do split', example: 'bbf67496-1379-4b6d-a348-fd5fa229f1c' })
+  @ApiPropertyOptional({
+    description: 'ID da carteira Asaas destino do split (opcional se subaccountExternalId for informado)',
+    example: 'bbf67496-1379-4b6d-a348-fd5fa229f1c',
+  })
+  @IsOptional()
   @IsString()
-  @IsNotEmpty()
-  walletId: string;
+  walletId?: string;
+
+  @ApiPropertyOptional({
+    description: 'ID de referência externa da subconta do parceiro (DX facilitada: dispensa busca manual de walletId)',
+    example: 'freelancer_usr_123',
+  })
+  @IsOptional()
+  @IsString()
+  @IsSafeText()
+  subaccountExternalId?: string;
 
   @ApiPropertyOptional({ description: 'Valor fixo repassado à carteira', example: 30.0 })
   @IsOptional()
