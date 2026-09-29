@@ -1,5 +1,7 @@
 import {
   Controller,
+  UsePipes,
+  ValidationPipe,
   Post,
   Body,
   HttpCode,
@@ -33,6 +35,7 @@ export class WebhookController {
   @Post('asaas')
   @HttpCode(HttpStatus.OK)
   @UseGuards(AsaasWebhookAuthGuard)
+  @UsePipes(new ValidationPipe({ whitelist: false, transform: true }))
   @ApiOperation({
     summary: 'Endpoint de recepção ultra-rápida de webhooks do Asaas (< 10ms)',
     description:

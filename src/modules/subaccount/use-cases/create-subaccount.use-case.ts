@@ -70,6 +70,7 @@ export class CreateSubaccountUseCase {
         if (subaccount.province) payload.province = subaccount.province;
         if (subaccount.postalCode) payload.postalCode = subaccount.postalCode.replace(/\D/g, '');
         if (subaccount.companyType) payload.companyType = subaccount.companyType;
+        if (cleanCpfCnpj.length === 11) payload.birthDate = '1990-01-01';
 
         const createdAccount = await this.asaasClient.post<any>('/v3/accounts', payload);
         asaasAccountId = createdAccount.id;

@@ -2,10 +2,10 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { IsNotEmpty, IsOptional, IsString } from 'class-validator';
 
 export class AsaasWebhookPayloadDto {
-  @ApiProperty({ description: 'ID do evento do Asaas', example: 'evt_080225913252a' })
+  @ApiPropertyOptional({ description: 'ID do evento do Asaas', example: 'evt_080225913252a' })
+  @IsOptional()
   @IsString()
-  @IsNotEmpty()
-  id: string;
+  id?: string;
 
   @ApiProperty({ description: 'Tipo do evento', example: 'PAYMENT_RECEIVED' })
   @IsString()

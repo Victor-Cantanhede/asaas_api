@@ -33,7 +33,8 @@ export class ProcessAsaasWebhookUseCase {
   ) {}
 
   async execute(payload: AsaasWebhookPayloadDto): Promise<ProcessWebhookResult> {
-    const existing = await this.webhookEventRepository.findByEventId(payload.id);
+    const eventId = payload.id || `evt_${payload.payment?.id || payload.subscription?.id || 'gen'}_${payload.event}_${Date.now()}`;
+    const existing = await this.webhookEventRepository.findByEventId(eventId);
     if (existing) {
       this.logger.warn(`Evento ${payload.id} já recebido anteriormente (descarte idempotente).`);
       return { isDuplicate: true, webhookEvent: existing };
@@ -41,7 +42,7 @@ export class ProcessAsaasWebhookUseCase {
 
     const asaasPaymentId = payload.payment?.id ?? null;
     const webhookEvent = await this.webhookEventRepository.create({
-      eventId: payload.id,
+      eventId,
       event: payload.event,
       asaasPaymentId,
       payload: JSON.stringify(payload),
