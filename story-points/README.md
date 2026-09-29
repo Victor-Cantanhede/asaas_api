@@ -2,7 +2,7 @@
 
 Bem-vindo ao repositório de instruções para a implementação modular do **Microsserviço de Abstração Asaas v3**.
 
-Esta pasta contém os arquivos de especificação detalhados para cada etapa (Story Point) do projeto, organizados em uma sequência estrita de execução. Cada arquivo foi desenhado para ser executado de forma **autônoma** por um agente de IA ou desenvolvedor, com especificações baseadas na coleção oficial do Asaas ([Asaas Collection.postman_collection.json](file:///c:/Users/victo/dev/asaas_api/Asaas%20Collection.postman_collection.json)), no padrão arquitetural de **Monólito Modular Orientado a Eventos (EDA)** e com aplicação estrita dos princípios **SOLID**.
+Esta pasta contém os arquivos de especificação detalhados para cada etapa (Story Point) do projeto, organizados em uma sequência estrita de execução. Cada arquivo foi desenhado para ser executado de forma **autônoma** por um agente de IA ou desenvolvedor, com especificações baseadas na coleção oficial do Asaas ([Asaas Collection.postman_collection.json](../Asaas%20Collection.postman_collection.json)), no padrão arquitetural de **Monólito Modular Orientado a Eventos (EDA)** e com aplicação estrita dos princípios **SOLID**.
 
 ---
 
@@ -122,14 +122,14 @@ Os Story Points devem ser executados **estritamente na ordem numérica**, pois c
 
 | SP | Arquivo de Instrução | Módulo / Escopo | Dependências |
 | :---: | :--- | :--- | :---: |
-| **00** | [SP-00-setup-infrastructure.md](file:///c:/Users/victo/dev/asaas_api/story-points/SP-00-setup-infrastructure.md) | Setup NestJS Híbrido (HTTP + RMQ), Prisma (Postgres 5436), RabbitMQ (5676/15672), MessagingModule (`IEventPublisher`), AsaasClientProvider & ApiKeyGuard | Nenhuma |
-| **01** | [SP-01-customers.md](file:///c:/Users/victo/dev/asaas_api/story-points/SP-01-customers.md) | Módulo de Clientes (POST 202 Accepted, evento `customer.sync`, Consumer assíncrono com Asaas, GET síncrono) | SP-00 |
-| **02** | [SP-02-pix-payments-split.md](file:///c:/Users/victo/dev/asaas_api/story-points/SP-02-pix-payments-split.md) | Cobranças PIX avulsas & Splits (POST 202 Accepted, evento `payment.create_pix`, Consumer gera cobrança e QR Code, GET polling) | SP-00, SP-01 |
-| **03** | [SP-03-credit-card-payments.md](file:///c:/Users/victo/dev/asaas_api/story-points/SP-03-credit-card-payments.md) | Cartão de Crédito avulso/parcelado/tokenizado (POST 202 Accepted, evento `payment.charge_credit_card`, Consumer processa débito e token) | SP-00, SP-01, SP-02 |
-| **04** | [SP-04-subscriptions-recurrence.md](file:///c:/Users/victo/dev/asaas_api/story-points/SP-04-subscriptions-recurrence.md) | Assinaturas Recorrentes (Criação, Troca de Cartão e Cancelamento via eventos assíncronos 202 Accepted) | SP-00, SP-01, SP-03 |
-| **05** | [SP-05-webhooks-idempotency.md](file:///c:/Users/victo/dev/asaas_api/story-points/SP-05-webhooks-idempotency.md) | Ingestão Webhooks Asaas (200 imediato em <10ms -> RabbitMQ), Consumer de Idempotência e Outbound Webhook Forwarder com DLQ | SP-00 a SP-04 |
-| **06** | [SP-06-swagger-docker-docs.md](file:///c:/Users/victo/dev/asaas_api/story-points/SP-06-swagger-docker-docs.md) | Swagger UI (com schemas 202 Accepted), Dockerfile, Docker Compose Prod (Postgres + RMQ + API Híbrida) & Testes E2E | SP-00 a SP-05 |
-| **07** | [SP-07-subaccounts-split-escrow.md](file:///c:/Users/victo/dev/asaas_api/story-points/SP-07-subaccounts-split-escrow.md) | Subcontas, Split Inteligente (por `subaccountExternalId`) & Conta Escrow (Custódia/Garantia 202 Accepted) | SP-00 a SP-06 |
+| **00** | [SP-00-setup-infrastructure.md](./SP-00-setup-infrastructure.md) | Setup NestJS Híbrido (HTTP + RMQ), Prisma (Postgres 5436), RabbitMQ (5676/15672), MessagingModule (`IEventPublisher`), AsaasClientProvider & ApiKeyGuard | Nenhuma |
+| **01** | [SP-01-customers.md](./SP-01-customers.md) | Módulo de Clientes (POST 202 Accepted, evento `customer.sync`, Consumer assíncrono com Asaas, GET síncrono) | SP-00 |
+| **02** | [SP-02-pix-payments-split.md](./SP-02-pix-payments-split.md) | Cobranças PIX avulsas & Splits (POST 202 Accepted, evento `payment.create_pix`, Consumer gera cobrança e QR Code, GET polling) | SP-00, SP-01 |
+| **03** | [SP-03-credit-card-payments.md](./SP-03-credit-card-payments.md) | Cartão de Crédito avulso/parcelado/tokenizado (POST 202 Accepted, evento `payment.charge_credit_card`, Consumer processa débito e token) | SP-00, SP-01, SP-02 |
+| **04** | [SP-04-subscriptions-recurrence.md](./SP-04-subscriptions-recurrence.md) | Assinaturas Recorrentes (Criação, Troca de Cartão e Cancelamento via eventos assíncronos 202 Accepted) | SP-00, SP-01, SP-03 |
+| **05** | [SP-05-webhooks-idempotency.md](./SP-05-webhooks-idempotency.md) | Ingestão Webhooks Asaas (200 imediato em <10ms -> RabbitMQ), Consumer de Idempotência e Outbound Webhook Forwarder com DLQ | SP-00 a SP-04 |
+| **06** | [SP-06-swagger-docker-docs.md](./SP-06-swagger-docker-docs.md) | Swagger UI (com schemas 202 Accepted), Dockerfile, Docker Compose Prod (Postgres + RMQ + API Híbrida) & Testes E2E | SP-00 a SP-05 |
+| **07** | [SP-07-subaccounts-split-escrow.md](./SP-07-subaccounts-split-escrow.md) | Subcontas, Split Inteligente (por `subaccountExternalId`) & Conta Escrow (Custódia/Garantia 202 Accepted) | SP-00 a SP-06 |
 
 ---
 

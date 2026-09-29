@@ -63,7 +63,7 @@ O módulo de **Subcontas & Escrow** é responsável pela gestão descentralizada
 ## 6. 🛡️ Peculiaridades, Resiliência & Edge Cases
 
 ### 6.1. Restrição de Unicidade de `asaasAccountId` (`@unique`)
-- No schema do Prisma ([schema.prisma](file:///c:/Users/victo/dev/asaas_api/prisma/schema.prisma)), a coluna `asaas_account_id` é estritamente única.
+- No schema do Prisma ([schema.prisma](../../../prisma/schema.prisma)), a coluna `asaas_account_id` é estritamente única.
 - **Armadilha de Colisão de Documento**: Se forem criadas duas subcontas locais distintas (com `externalId`s diferentes) utilizando o mesmo CPF/CNPJ, ambas resolverão para a mesma conta no Asaas na busca por documento.
 - Ao salvar a segunda subconta, o PostgreSQL disparará erro de violação de chave única (`Unique constraint failed on the fields: (asaas_account_id)`). Portanto, a aplicação consumidora deve garantir que cada subconta possua documento fiscal exclusivo.
 

@@ -213,7 +213,7 @@ describe('ProcessUpdateSubscriptionCardUseCase (Unit & Reliability Specialist)',
       await expect(
         useCase.execute({
           subscriptionId: 'sub_inexistente',
-          remoteIp: '10.0.0.1',
+          remoteIp: '203.0.113.195',
         }),
       ).resolves.not.toThrow();
 
@@ -232,7 +232,7 @@ describe('ProcessUpdateSubscriptionCardUseCase (Unit & Reliability Specialist)',
       await expect(
         useCase.execute({
           subscriptionId: 'sub_sem_asaas_id',
-          remoteIp: '10.0.0.1',
+          remoteIp: '203.0.113.195',
         }),
       ).resolves.not.toThrow();
 

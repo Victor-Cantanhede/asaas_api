@@ -2,7 +2,7 @@
 
 - **Sprint**: 3
 - **Status**: Concluído
-- **Dependências**: [SP-00-setup-infrastructure.md](file:///c:/Users/victo/dev/asaas_api/story-points/SP-00-setup-infrastructure.md), [SP-01-customers.md](file:///c:/Users/victo/dev/asaas_api/story-points/SP-01-customers.md), [SP-02-pix-payments-split.md](file:///c:/Users/victo/dev/asaas_api/story-points/SP-02-pix-payments-split.md)
+- **Dependências**: [SP-00-setup-infrastructure.md](./SP-00-setup-infrastructure.md), [SP-01-customers.md](./SP-01-customers.md), [SP-02-pix-payments-split.md](./SP-02-pix-payments-split.md)
 - **Objetivo**: Implementar cobranças com Cartão de Crédito de forma 100% orientada a eventos via RabbitMQ, suportando tanto dados do cartão quanto token reutilizável (`creditCardToken`), parcelamento e split. O endpoint HTTP responde de imediato `HTTP 202 Accepted`, enquanto o worker do RabbitMQ processa o débito junto ao Asaas e registra o resultado e tokenização no banco local.
 
 ---

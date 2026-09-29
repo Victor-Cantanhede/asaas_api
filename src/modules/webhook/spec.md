@@ -75,7 +75,7 @@ Contudo, no NestJS:
 - Quando o Asaas envia campos como `account`, o pipe global gerava rejeição imediata com `HTTP 400 Bad Request: ["property account should not exist"]`.
 - **Penalização pelo Asaas**: Quando uma URL de webhook responde repetidamente com status `400` ou `500`, o gateway Asaas marca a URL com **"Penalização aplicada"** e desativa o envio temporariamente.
 - **Solução Arquitetural (`GlobalAppValidationPipe`)**:  
-  Em [src/main.ts](file:///c:/Users/victo/dev/asaas_api/src/main.ts), foi introduzida a classe `GlobalAppValidationPipe` que herda de `ValidationPipe`. Ao validar instâncias de `AsaasWebhookPayloadDto`, ela desativa dinamicamente `whitelist: false` e `forbidNonWhitelisted: false`, mantendo a validação estrita em todas as demais rotas da aplicação sem quebrar webhooks com novos campos do gateway.
+  Em [src/main.ts](../../main.ts), foi introduzida a classe `GlobalAppValidationPipe` que herda de `ValidationPipe`. Ao validar instâncias de `AsaasWebhookPayloadDto`, ela desativa dinamicamente `whitelist: false` e `forbidNonWhitelisted: false`, mantendo a validação estrita em todas as demais rotas da aplicação sem quebrar webhooks com novos campos do gateway.
 
 ### 6.3. Idempotência e Geração de Fallback do `eventId`
 - O Asaas envia identificadores únicos de evento como `evt_d26e303b...&20598710`.

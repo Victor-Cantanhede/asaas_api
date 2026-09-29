@@ -2,7 +2,7 @@
 
 - **Sprint**: 4
 - **Status**: Concluído
-- **Dependências**: [SP-00-setup-infrastructure.md](file:///c:/Users/victo/dev/asaas_api/story-points/SP-00-setup-infrastructure.md), [SP-01-customers.md](file:///c:/Users/victo/dev/asaas_api/story-points/SP-01-customers.md), [SP-03-credit-card-payments.md](file:///c:/Users/victo/dev/asaas_api/story-points/SP-03-credit-card-payments.md)
+- **Dependências**: [SP-00-setup-infrastructure.md](./SP-00-setup-infrastructure.md), [SP-01-customers.md](./SP-01-customers.md), [SP-03-credit-card-payments.md](./SP-03-credit-card-payments.md)
 - **Objetivo**: Implementar o ciclo de vida completo de assinaturas recorrentes com Cartão de Crédito de forma 100% orientada a eventos via RabbitMQ. Todos os endpoints de comando (`POST`, `PUT`, `DELETE`) respondem de imediato `HTTP 202 Accepted` e enfileiram eventos de criação, alteração de cartão e cancelamento para consumo resiliente pelos workers.
 
 ---

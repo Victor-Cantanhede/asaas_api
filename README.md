@@ -310,13 +310,13 @@ npm run test:e2e
 ## 📚 Documentações Técnicas dos Módulos (`spec.md`)
 
 Cada módulo do sistema possui documentação técnica dedicada e formalizada:
-- [src/infra/security/spec.md](file:///c:/Users/victo/dev/asaas_api/src/infra/security/spec.md) — Segurança, RBAC M2M, Criptografia PCI-DSS e Decisões de Arquitetura.
-- [src/infra/messaging/spec.md](file:///c:/Users/victo/dev/asaas_api/src/infra/messaging/spec.md) — Infraestrutura RabbitMQ e Porta `IEventPublisher`.
-- [src/infra/asaas/spec.md](file:///c:/Users/victo/dev/asaas_api/src/infra/asaas/spec.md) — Provedor HTTP do gateway Asaas v3 e exceções estruturadas.
-- [src/modules/customer/spec.md](file:///c:/Users/victo/dev/asaas_api/src/modules/customer/spec.md) — Módulo de Clientes e evento `customer.sync`.
-- [src/modules/payment/spec.md](file:///c:/Users/victo/dev/asaas_api/src/modules/payment/spec.md) — Módulo de Cobranças PIX, Cartão de Crédito e Split.
-- [src/modules/subscription/spec.md](file:///c:/Users/victo/dev/asaas_api/src/modules/subscription/spec.md) — Ciclo de vida de assinaturas e recorrência.
-- [src/modules/webhook/spec.md](file:///c:/Users/victo/dev/asaas_api/src/modules/webhook/spec.md) — Ingestão de webhooks <10ms, idempotência e repasse.
+- [src/infra/security/spec.md](./src/infra/security/spec.md) — Segurança, RBAC M2M, Criptografia PCI-DSS e Decisões de Arquitetura.
+- [src/infra/messaging/spec.md](./src/infra/messaging/spec.md) — Infraestrutura RabbitMQ e Porta `IEventPublisher`.
+- [src/infra/asaas/spec.md](./src/infra/asaas/spec.md) — Provedor HTTP do gateway Asaas v3 e exceções estruturadas.
+- [src/modules/customer/spec.md](./src/modules/customer/spec.md) — Módulo de Clientes e evento `customer.sync`.
+- [src/modules/payment/spec.md](./src/modules/payment/spec.md) — Módulo de Cobranças PIX, Cartão de Crédito e Split.
+- [src/modules/subscription/spec.md](./src/modules/subscription/spec.md) — Ciclo de vida de assinaturas e recorrência.
+- [src/modules/webhook/spec.md](./src/modules/webhook/spec.md) — Ingestão de webhooks <10ms, idempotência e repasse.
 
 ---
 

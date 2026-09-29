@@ -268,7 +268,7 @@ describe('ProcessCreateSubscriptionUseCase (Unit & Reliability Specialist)', () 
 
       await useCase.execute({
         subscriptionId: 'sub_no_due_date',
-        remoteIp: '10.0.0.1',
+        remoteIp: '203.0.113.195',
         creditCardToken: 'tok_3',
       });
 
@@ -300,7 +300,7 @@ describe('ProcessCreateSubscriptionUseCase (Unit & Reliability Specialist)', () 
 
       const input = Object.freeze({
         subscriptionId: 'sub_freeze',
-        remoteIp: '10.0.0.1',
+        remoteIp: '203.0.113.195',
         creditCardToken: 'tok_freeze',
       });
 
@@ -316,7 +316,7 @@ describe('ProcessCreateSubscriptionUseCase (Unit & Reliability Specialist)', () 
       await expect(
         useCase.execute({
           subscriptionId: 'sub_missing',
-          remoteIp: '10.0.0.1',
+          remoteIp: '203.0.113.195',
         }),
       ).resolves.not.toThrow();
 
@@ -336,7 +336,7 @@ describe('ProcessCreateSubscriptionUseCase (Unit & Reliability Specialist)', () 
 
       await useCase.execute({
         subscriptionId: 'sub_no_client',
-        remoteIp: '10.0.0.1',
+        remoteIp: '203.0.113.195',
       });
 
       expect(subscriptionRepositoryMock.updateStatus).toHaveBeenCalledWith(
@@ -364,7 +364,7 @@ describe('ProcessCreateSubscriptionUseCase (Unit & Reliability Specialist)', () 
 
       await useCase.execute({
         subscriptionId: 'sub_sync_fail',
-        remoteIp: '10.0.0.1',
+        remoteIp: '203.0.113.195',
       });
 
       expect(syncCustomerUseCaseMock.execute).toHaveBeenCalled();

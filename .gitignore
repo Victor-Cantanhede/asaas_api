@@ -18,6 +18,16 @@ Thumbs.db
 .env
 .env.local
 .env.*.local
+.env.test
+.env.production
+.env.staging
+
+# Cryptographic keys and certificates
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
 
 # IDE
 .idea

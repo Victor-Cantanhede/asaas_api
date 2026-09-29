@@ -2,7 +2,7 @@
 
 - **Sprint**: 2
 - **Status**: Concluído
-- **Dependências**: [SP-00-setup-infrastructure.md](file:///c:/Users/victo/dev/asaas_api/story-points/SP-00-setup-infrastructure.md), [SP-01-customers.md](file:///c:/Users/victo/dev/asaas_api/story-points/SP-01-customers.md)
+- **Dependências**: [SP-00-setup-infrastructure.md](./SP-00-setup-infrastructure.md), [SP-01-customers.md](./SP-01-customers.md)
 - **Objetivo**: Implementar emissão assíncrona de cobranças PIX e Split via RabbitMQ, retornando `HTTP 202 Accepted` de forma imediata ao backend consumidor, processando a criação da cobrança e captura do QR Code (Base64 e Copia-e-Cola) no worker do RabbitMQ, e fornecendo endpoint `GET /payments/:id` para consulta síncrona / polling.
 
 ---

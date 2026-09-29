@@ -2,7 +2,7 @@
 
 - **Sprint**: 1
 - **Status**: Concluído
-- **Dependências**: [SP-00-setup-infrastructure.md](file:///c:/Users/victo/dev/asaas_api/story-points/SP-00-setup-infrastructure.md)
+- **Dependências**: [SP-00-setup-infrastructure.md](./SP-00-setup-infrastructure.md)
 - **Objetivo**: Implementar o módulo de gestão e sincronização assíncrona de clientes Asaas com base no `externalId`, retornando `HTTP 202 Accepted` no endpoint de comando, processando a sincronização com o Asaas através de workers do RabbitMQ e mantendo consulta síncrona local para polling.
 
 ---

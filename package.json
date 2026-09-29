@@ -4,7 +4,7 @@
   "description": "Microsserviço de abstração e gateway assíncrono para o Asaas v3 orientado a eventos",
   "author": "",
   "private": true,
-  "license": "UNLICENSED",
+  "license": "MIT",
   "scripts": {
     "build": "nest build",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",

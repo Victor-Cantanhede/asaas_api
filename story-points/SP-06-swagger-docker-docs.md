@@ -2,7 +2,7 @@
 
 - **Sprint**: 6
 - **Status**: Concluído
-- **Dependências**: [SP-00-setup-infrastructure.md](file:///c:/Users/victo/dev/asaas_api/story-points/SP-00-setup-infrastructure.md) a [SP-05-webhooks-idempotency.md](file:///c:/Users/victo/dev/asaas_api/story-points/SP-05-webhooks-idempotency.md)
+- **Dependências**: [SP-00-setup-infrastructure.md](./SP-00-setup-infrastructure.md) a [SP-05-webhooks-idempotency.md](./SP-05-webhooks-idempotency.md)
 - **Objetivo**: Configurar a documentação interativa Swagger em `/docs` evidenciando o padrão de resposta assíncrona `HTTP 202 Accepted`, criar o empacotamento com `Dockerfile` multi-stage e os **dois arquivos de Docker Compose (`docker-compose.dev.yml` e `docker-compose.prod.yml` com PostgreSQL 5436 e RabbitMQ 5676/15672)**, elaborar o `README.md` raiz com exemplos cURL assíncronos e implementar a suíte de testes E2E.
 
 ---

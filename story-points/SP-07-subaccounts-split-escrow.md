@@ -2,7 +2,7 @@
 
 - **Sprint**: 7
 - **Status**: Concluído
-- **Dependências**: [SP-00-setup-infrastructure.md](file:///c:/Users/victo/dev/asaas_api/story-points/SP-00-setup-infrastructure.md) a [SP-06-swagger-docker-docs.md](file:///c:/Users/victo/dev/asaas_api/story-points/SP-06-swagger-docker-docs.md)
+- **Dependências**: [SP-00-setup-infrastructure.md](./SP-00-setup-infrastructure.md) a [SP-06-swagger-docker-docs.md](./SP-06-swagger-docker-docs.md)
 - **Objetivo**: Implementar infraestrutura completa para marketplaces e intermediação financeira, permitindo o provisionamento assíncrono de subcontas, divisão de pagamentos (Split) com retenção em custódia (Conta Escrow) na carteira do prestador/parceiro, e liberação de garantia quando a entrega for confirmada. Foco prioritário em **Developer Experience (DX)**, desacoplamento e conformidade estrita com o padrão assíncrono (**HTTP 202 Accepted + RabbitMQ**).
 
 ---

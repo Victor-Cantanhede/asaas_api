@@ -2,7 +2,7 @@
 
 - **Sprint**: 5
 - **Status**: Concluído
-- **Dependências**: [SP-00-setup-infrastructure.md](file:///c:/Users/victo/dev/asaas_api/story-points/SP-00-setup-infrastructure.md) a [SP-04-subscriptions-recurrence.md](file:///c:/Users/victo/dev/asaas_api/story-points/SP-04-subscriptions-recurrence.md)
+- **Dependências**: [SP-00-setup-infrastructure.md](./SP-00-setup-infrastructure.md) a [SP-04-subscriptions-recurrence.md](./SP-04-subscriptions-recurrence.md)
 - **Objetivo**: Implementar o receptor de webhooks do Asaas de forma 100% orientada a eventos. O endpoint responde `HTTP 200 OK` ao Asaas em menos de 10ms e delega o processamento da idempotência, sincronização de status e repasse para o backend consumidor (`CLIENT_WEBHOOK_URL`) através de workers dedicados no RabbitMQ com suporte a Dead Letter Queue (DLQ).
 
 ---
