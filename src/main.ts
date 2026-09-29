@@ -5,13 +5,27 @@ import { MicroserviceOptions, Transport } from '@nestjs/microservices';
 import { AppModule } from './app.module';
 
 import { setupSwagger } from './setup-swagger';
+import { AsaasWebhookPayloadDto } from './modules/webhook/dto/asaas-webhook-payload.dto';
+
+class GlobalAppValidationPipe extends ValidationPipe {
+  protected async validate(entity: object, validatorOptions?: any) {
+    if (entity instanceof AsaasWebhookPayloadDto) {
+      return super.validate(entity, {
+        ...validatorOptions,
+        whitelist: false,
+        forbidNonWhitelisted: false,
+      });
+    }
+    return super.validate(entity, validatorOptions);
+  }
+}
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   const configService = app.get(ConfigService);
 
   app.useGlobalPipes(
-    new ValidationPipe({
+    new GlobalAppValidationPipe({
       whitelist: true,
       forbidNonWhitelisted: true,
       transform: true,

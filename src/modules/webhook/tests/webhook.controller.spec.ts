@@ -53,4 +53,29 @@ describe('WebhookController', () => {
         'Webhook recebido com sucesso e enfileirado para processamento assíncrono.',
     });
   });
+
+  it('should accept webhook with account and complex nested split object', async () => {
+    const payload: AsaasWebhookPayloadDto = {
+      id: 'evt_d26e303b238e509335ac9ba210e51b0f&20598710',
+      event: 'PAYMENT_RECEIVED',
+      dateCreated: '2026-09-29 17:25:12',
+      account: {
+        id: '24c199c1-77b9-46a5-9ccf-870231cc1eb4',
+        ownerId: null,
+      },
+      payment: {
+        id: 'pay_2bsk77vcygishn6v',
+        status: 'RECEIVED',
+        value: 17500.0,
+      },
+    };
+
+    const response = await controller.receiveAsaasWebhook(payload);
+
+    expect(eventPublisherMock.publish).toHaveBeenCalledWith(
+      'webhook.received',
+      payload,
+    );
+    expect(response.received).toBe(true);
+  });
 });

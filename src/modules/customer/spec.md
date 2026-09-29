@@ -64,6 +64,10 @@ O `CustomerModule` representa o Bounded Context responsável pelo ciclo de vida,
 ---
 
 ## 6. 🛡️ Resiliência, Edge Cases & Segurança
+- **Restrição de Unicidade de `asaasCustomerId` (`@unique`)**:
+  - No schema do Prisma ([schema.prisma](file:///c:/Users/victo/dev/asaas_api/prisma/schema.prisma)), a coluna `asaas_customer_id` possui restrição de unicidade.
+  - **Armadilha de Documento Compartilhado**: Se múltiplos clientes locais forem cadastrados com `externalId`s distintos porém com o mesmo CPF/CNPJ, a busca idempotente no Asaas por documento (`GET /v3/customers?cpfCnpj=...`) retornará o mesmo cliente Asaas (`cus_...`).
+  - Ao tentar salvar esse mesmo `asaasCustomerId` no segundo cliente local via `updateSynced`, o PostgreSQL rejeitará a operação com violação de chave única (`Unique constraint failed on the fields: (asaas_customer_id)`). A aplicação cliente deve assegurar unicidade de documento ou associar o mesmo `externalId`.
 - **Validação Anti-XSS**: O decorator `@IsSafeText()` impede injeções de script em campos de nome de clientes, prevenindo Stored XSS em painéis administrativos consumidores.
 - **Controle de Acesso RBAC**: Chaves restritas a consultas (`API_KEY_READ`) são impedidas de emitir cadastros (`POST`), recebendo `403 Forbidden`.
 - **Falha de Validação Asaas (400)**: Salva status `FAILED` com a mensagem em `failureReason` e efetua `ack()` para não sobrecarregar a fila com mensagens inválidas.

@@ -98,6 +98,7 @@ O `PaymentModule` gerencia o ciclo de vida completo de cobranças financeiras av
 - **Recusa de Cartão (400 Asaas / Transação Negada)**: Registra status `FAILED`, armazena justificativa em `failureReason`, notifica em `webhook.forward_to_client` e faz `channel.ack(msg)` para não reprocessar cartão negado.
 - **Falha de Conectividade / 5xx Asaas**: Marca status `FAILED` e dispara `channel.nack(msg, false, true)` para retentativa no broker.
 - **Confirmação Manual**: Todos os consumers (`PaymentPixConsumer`, `PaymentCreditCardConsumer`, `PaymentEscrowConsumer`) utilizam manual ack (`noAck: false`).
+- **Webhooks de Cobranças com Split e Custódia**: Cobranças com split geram webhooks no Asaas contendo o nó raiz `account` (identificador da subconta/carteira). O `WebhookModule` concilia os dados atualizando `status`, `netValue`, `paymentDate`, `escrowStatus` e dispara `webhook.forward_to_client` com o payload íntegro.
 
 ---
 

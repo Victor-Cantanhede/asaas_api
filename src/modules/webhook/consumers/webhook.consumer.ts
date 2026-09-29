@@ -25,13 +25,22 @@ export class WebhookConsumer {
   ) {
     const channel = context.getChannelRef();
     const originalMsg = context.getMessage();
+    const eventIdentifier = payload?.id || payload?.event || 'desconhecido';
 
     try {
-      this.logger.log(`Consumindo webhook.received para evento: ${payload?.id}`);
+      this.logger.log(
+        `[WebhookConsumer] Consumindo webhook.received: evento=${payload?.event}, id=${payload?.id || 'sem_id'}, paymentId=${payload?.payment?.id || 'n/a'}, subId=${payload?.subscription?.id || 'n/a'}`,
+      );
       const result = await this.processAsaasWebhookUseCase.execute(payload);
 
-      if (!result.isDuplicate) {
-        // Enfileira para repasse ao backend consumidor
+      if (result.isDuplicate) {
+        this.logger.warn(
+          `[WebhookConsumer] Evento duplicado detectado (${eventIdentifier}). Descarte idempotente concluído sem repasse.`,
+        );
+      } else {
+        this.logger.log(
+          `[WebhookConsumer] Evento ${eventIdentifier} processado localmente. Publicando "${EVENT_PATTERNS.WEBHOOK_FORWARD_TO_CLIENT}" para repasse ao backend consumidor.`,
+        );
         await this.eventPublisher.publish(
           EVENT_PATTERNS.WEBHOOK_FORWARD_TO_CLIENT,
           payload,
@@ -39,9 +48,14 @@ export class WebhookConsumer {
       }
 
       channel.ack(originalMsg);
-      this.logger.log(`Webhook ${payload?.id} processado com sucesso (ack).`);
+      this.logger.log(
+        `[WebhookConsumer] Webhook ${eventIdentifier} finalizado com sucesso no RabbitMQ (ack).`,
+      );
     } catch (error: any) {
-      this.logger.error(`Erro ao processar webhook.received: ${error.message}`);
+      this.logger.error(
+        `[WebhookConsumer] Falha ao processar webhook.received (${eventIdentifier}): ${error.message}`,
+        error.stack,
+      );
       channel.ack(originalMsg);
     }
   }

@@ -8,6 +8,7 @@ import {
   HttpStatus,
   UseGuards,
   Inject,
+  Logger,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -27,6 +28,8 @@ import { WebhookResponseDto } from './dto/webhook-response.dto';
 @ApiTags('Webhooks')
 @Controller('webhooks')
 export class WebhookController {
+  private readonly logger = new Logger(WebhookController.name);
+
   constructor(
     @Inject(EVENT_PUBLISHER_TOKEN)
     private readonly eventPublisher: IEventPublisher,
@@ -58,10 +61,24 @@ export class WebhookController {
   async receiveAsaasWebhook(
     @Body() payload: AsaasWebhookPayloadDto,
   ): Promise<WebhookResponseDto> {
-    await this.eventPublisher.publish(
-      EVENT_PATTERNS.WEBHOOK_RECEIVED,
-      payload,
-    );
+    const summary = `evento=${payload.event}, id=${payload.id || 'sem_id'}, paymentId=${payload.payment?.id || 'n/a'}, subId=${payload.subscription?.id || 'n/a'}`;
+    this.logger.log(`[WebhookController] Notificação HTTP recebida do Asaas: ${summary}`);
+
+    try {
+      await this.eventPublisher.publish(
+        EVENT_PATTERNS.WEBHOOK_RECEIVED,
+        payload,
+      );
+      this.logger.log(
+        `[WebhookController] Evento ${payload.event} (${payload.id || 'sem_id'}) enfileirado com sucesso em "${EVENT_PATTERNS.WEBHOOK_RECEIVED}".`,
+      );
+    } catch (pubError: any) {
+      this.logger.error(
+        `[WebhookController] Falha ao enfileirar webhook ${payload.event}: ${pubError.message}`,
+        pubError.stack,
+      );
+      throw pubError;
+    }
 
     return {
       received: true,

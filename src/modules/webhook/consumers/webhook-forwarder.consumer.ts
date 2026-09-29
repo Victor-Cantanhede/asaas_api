@@ -43,7 +43,9 @@ export class WebhookForwarderConsumer {
     }
 
     try {
-      this.logger.log(`Repassando webhook para o backend consumidor em ${clientWebhookUrl}`);
+      this.logger.log(
+        `[WebhookForwarderConsumer] Repassando evento ${payload?.event || 'desconhecido'} (${eventId || 'sem_id'}) para o backend consumidor em ${clientWebhookUrl}`,
+      );
 
       const response = await fetch(clientWebhookUrl, {
         method: 'POST',
@@ -55,7 +57,13 @@ export class WebhookForwarderConsumer {
       });
 
       if (!response.ok) {
-        throw new Error(`Consumidor respondeu com status HTTP ${response.status}`);
+        let errorBody = '';
+        if (typeof response.text === 'function') {
+          errorBody = await response.text().catch(() => '');
+        }
+        throw new Error(
+          `Consumidor respondeu com status HTTP ${response.status}${errorBody ? `: ${errorBody.slice(0, 300)}` : ''}`,
+        );
       }
 
       if (localEvent) {
@@ -67,9 +75,13 @@ export class WebhookForwarderConsumer {
       }
 
       channel.ack(originalMsg);
-      this.logger.log(`Webhook repassado com sucesso para ${clientWebhookUrl}`);
+      this.logger.log(
+        `[WebhookForwarderConsumer] Webhook repassado com sucesso para ${clientWebhookUrl} (HTTP ${response.status}).`,
+      );
     } catch (error: any) {
-      this.logger.warn(`Falha ao repassar webhook para ${clientWebhookUrl}: ${error.message}`);
+      this.logger.warn(
+        `[WebhookForwarderConsumer] Falha ao repassar webhook para ${clientWebhookUrl}: ${error.message}`,
+      );
 
       if (localEvent) {
         await this.webhookEventRepository.updateForwardStatus(

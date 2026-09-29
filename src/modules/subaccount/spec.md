@@ -48,21 +48,33 @@ O módulo de **Subcontas & Escrow** é responsável pela gestão descentralizada
 ## 5. ⚙️ Casos de Uso & Regras de Negócio
 1. **`CreateSubaccountUseCase`**:
    - Localiza a subconta local.
-   - Consulta Asaas por CPF/CNPJ para evitar duplicidade.
-   - Invoca `POST /v3/accounts` caso inexistente.
-   - Se `escrowEnabled === true`, invoca `POST /v3/accounts/{id}/escrow`.
+   - Consulta Asaas por CPF/CNPJ para evitar duplicidade (`GET /v3/accounts?cpfCnpj=...`).
+   - Se a conta já existir no Asaas, reutiliza `id` e `walletId`.
+   - Se inexistente, formata o payload. Para CPFs de 11 dígitos, injeta `birthDate: '1990-01-01'` (obrigatório pelo Asaas v3 quando não informado).
+   - Invoca `POST /v3/accounts`.
+   - Se `escrowEnabled === true`, invoca `POST /v3/accounts/{id}/escrow` configurando dias de retenção.
    - Atualiza `walletId` e `status = 'SYNCED'` no banco local.
-   - Emite notificação de conclusão para o webhook do cliente.
+   - Emite notificação de conclusão para o webhook do cliente via `webhook.forward_to_client`.
 2. **`GetSubaccountByExternalIdUseCase`**:
    - Leitura síncrona por `externalId`. Lança `NotFoundException` se não localizado.
 
 ---
 
-## 6. 🛡️ Resiliência, Edge Cases & Falhas
-- **Confirmação Manual no RabbitMQ**:
-  - Sucesso -> `channel.ack(originalMsg)`
-  - Erro 400 Asaas -> Marca `FAILED` no banco e faz `ack` (evita loop de veneno)
-  - Erro 5xx / Conexão -> `channel.nack(originalMsg, false, true)` para retentativa
+## 6. 🛡️ Peculiaridades, Resiliência & Edge Cases
+
+### 6.1. Restrição de Unicidade de `asaasAccountId` (`@unique`)
+- No schema do Prisma ([schema.prisma](file:///c:/Users/victo/dev/asaas_api/prisma/schema.prisma)), a coluna `asaas_account_id` é estritamente única.
+- **Armadilha de Colisão de Documento**: Se forem criadas duas subcontas locais distintas (com `externalId`s diferentes) utilizando o mesmo CPF/CNPJ, ambas resolverão para a mesma conta no Asaas na busca por documento.
+- Ao salvar a segunda subconta, o PostgreSQL disparará erro de violação de chave única (`Unique constraint failed on the fields: (asaas_account_id)`). Portanto, a aplicação consumidora deve garantir que cada subconta possua documento fiscal exclusivo.
+
+### 6.2. Impacto nos Webhooks do Asaas (Nó `account`)
+- A ativação de subcontas faz com que o gateway Asaas v3 inclua o nó `"account": { "id": "uuid-da-subconta", "ownerId": null }` na raiz de todos os webhooks de cobrança e split associados.
+- O `WebhookModule` e o `GlobalAppValidationPipe` estão configurados para reconhecer e aceitar esse nó sem disparar erro de validação 400.
+
+### 6.3. Confirmação Manual no RabbitMQ
+- Sucesso -> `channel.ack(originalMsg)`
+- Erro 400 Asaas / Negócio -> Marca `FAILED` no banco e faz `ack` (evita loop de veneno)
+- Erro 5xx / Conexão -> `channel.nack(originalMsg, false, true)` para retentativa
 
 ---
 

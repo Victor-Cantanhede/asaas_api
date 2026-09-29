@@ -36,7 +36,7 @@ export class ProcessAsaasWebhookUseCase {
     const eventId = payload.id || `evt_${payload.payment?.id || payload.subscription?.id || 'gen'}_${payload.event}_${Date.now()}`;
     const existing = await this.webhookEventRepository.findByEventId(eventId);
     if (existing) {
-      this.logger.warn(`Evento ${payload.id} já recebido anteriormente (descarte idempotente).`);
+      this.logger.warn(`[ProcessAsaasWebhookUseCase] Evento ${eventId} já recebido anteriormente (descarte idempotente).`);
       return { isDuplicate: true, webhookEvent: existing };
     }
 
@@ -47,6 +47,10 @@ export class ProcessAsaasWebhookUseCase {
       asaasPaymentId,
       payload: JSON.stringify(payload),
     });
+
+    this.logger.log(
+      `[ProcessAsaasWebhookUseCase] Evento ${eventId} (${payload.event}) registrado na auditoria webhook_events (id: ${webhookEvent.id}).`,
+    );
 
     try {
       // 1. Atualização de Pagamento se aplicável
@@ -82,7 +86,13 @@ export class ProcessAsaasWebhookUseCase {
           }
 
           await this.paymentRepository.update(payment.id, updateData);
-          this.logger.log(`Pagamento local ${payment.id} atualizado pelo webhook ${payload.event}`);
+          this.logger.log(
+            `[ProcessAsaasWebhookUseCase] Pagamento local ${payment.id} (asaasPaymentId: ${asaasPaymentId}) atualizado pelo webhook ${payload.event}. Dados: ${JSON.stringify(updateData)}`,
+          );
+        } else {
+          this.logger.warn(
+            `[ProcessAsaasWebhookUseCase] Cobrança Asaas "${asaasPaymentId}" recebida no evento ${payload.event}, mas nenhum pagamento local correspondente foi localizado.`,
+          );
         }
       }
 
@@ -101,14 +111,26 @@ export class ProcessAsaasWebhookUseCase {
           }
 
           await this.subscriptionRepository.update(subscription.id, updateData);
-          this.logger.log(`Assinatura local ${subscription.id} atualizada pelo webhook ${payload.event}`);
+          this.logger.log(
+            `[ProcessAsaasWebhookUseCase] Assinatura local ${subscription.id} (asaasSubscriptionId: ${payload.subscription.id}) atualizada pelo webhook ${payload.event}. Dados: ${JSON.stringify(updateData)}`,
+          );
+        } else {
+          this.logger.warn(
+            `[ProcessAsaasWebhookUseCase] Assinatura Asaas "${payload.subscription.id}" recebida no evento ${payload.event}, mas nenhuma assinatura local correspondente foi localizada.`,
+          );
         }
       }
 
       await this.webhookEventRepository.markProcessed(webhookEvent.id);
+      this.logger.log(
+        `[ProcessAsaasWebhookUseCase] WebhookEvent ${webhookEvent.id} (${eventId}) marcado como processado com sucesso.`,
+      );
       return { isDuplicate: false, webhookEvent };
     } catch (error: any) {
-      this.logger.error(`Erro ao processar entidades do webhook ${payload.id}: ${error.message}`);
+      this.logger.error(
+        `[ProcessAsaasWebhookUseCase] Erro ao processar entidades do webhook ${eventId} (${payload.event}): ${error.message}`,
+        error.stack,
+      );
       throw error;
     }
   }
