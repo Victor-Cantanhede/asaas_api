@@ -90,6 +90,32 @@ describe('CardEncryptionService', () => {
     expect(service.encrypt(undefined as any)).toBe('');
   });
 
+  it('should encrypt and decrypt arbitrary text safely', () => {
+    const secretApiKey = '$aact_Y3A0Y21...sample_api_key_12345';
+    const encrypted = service.encryptText(secretApiKey);
+
+    expect(encrypted).toBeDefined();
+    expect(encrypted).not.toContain(secretApiKey);
+    expect(service.isEncrypted(encrypted)).toBe(true);
+
+    const decrypted = service.decryptText(encrypted);
+    expect(decrypted).toBe(secretApiKey);
+  });
+
+  it('should throw error when decryptText is called with empty or invalid envelope', () => {
+    expect(() => service.decryptText('')).toThrow(
+      'Envelope criptografado não fornecido',
+    );
+    expect(() => service.decryptText('invalid:format')).toThrow(
+      'Formato de envelope criptografado inválido',
+    );
+  });
+
+  it('should return empty string when encryptText is called with empty text', () => {
+    expect(service.encryptText('')).toBe('');
+    expect(service.encryptText(null as any)).toBe('');
+  });
+
   it('should correctly evaluate isEncrypted', () => {
     expect(service.isEncrypted('')).toBe(false);
     expect(service.isEncrypted('something')).toBe(false);

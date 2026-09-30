@@ -96,11 +96,14 @@ export class ProcessPixPaymentUseCase {
         payload.externalReference = payment.externalReference;
       }
 
-      // DX: Resolução de split por subaccountExternalId ou walletId
+      // DX: Resolução de split por subaccountExternalId ou walletId com validação preventiva
       if (payment.splitConfig) {
         try {
           const rawSplit = JSON.parse(payment.splitConfig);
           if (Array.isArray(rawSplit)) {
+            let totalFixedSplit = 0;
+            let totalPercentualSplit = 0;
+
             const resolvedSplit = await Promise.all(
               rawSplit.map(async (item: any) => {
                 let targetWalletId = item.walletId;
@@ -116,6 +119,20 @@ export class ProcessPixPaymentUseCase {
                     targetWalletId = subacc.walletId;
                   }
                 }
+
+                if (!targetWalletId) {
+                  throw new AsaasBadRequestException(
+                    `Subconta "${item.subaccountExternalId || 'desconhecida'}" não possui walletId ativo para split`,
+                  );
+                }
+
+                if (item.fixedValue !== undefined) {
+                  totalFixedSplit += Number(item.fixedValue);
+                }
+                if (item.percentualValue !== undefined) {
+                  totalPercentualSplit += Number(item.percentualValue);
+                }
+
                 const splitItem: any = { walletId: targetWalletId };
                 if (item.fixedValue !== undefined) splitItem.fixedValue = item.fixedValue;
                 if (item.percentualValue !== undefined)
@@ -124,10 +141,25 @@ export class ProcessPixPaymentUseCase {
                 return splitItem;
               }),
             );
+
+            if (totalFixedSplit > payment.value) {
+              throw new AsaasBadRequestException(
+                `A soma dos valores fixos de split (R$ ${totalFixedSplit.toFixed(2)}) não pode exceder o valor total da cobrança (R$ ${payment.value.toFixed(2)})`,
+              );
+            }
+            if (totalPercentualSplit > 100) {
+              throw new AsaasBadRequestException(
+                `A soma dos percentuais de split (${totalPercentualSplit}%) não pode exceder 100%`,
+              );
+            }
+
             payload.split = resolvedSplit;
           }
-        } catch {
-          this.logger.warn(`Erro ao parsear splitConfig para pagamento ${payment.id}`);
+        } catch (splitErr: any) {
+          if (splitErr instanceof AsaasBadRequestException) {
+            throw splitErr;
+          }
+          this.logger.warn(`Erro ao parsear splitConfig para pagamento ${payment.id}: ${splitErr.message}`);
         }
       }
 
@@ -154,9 +186,8 @@ export class ProcessPixPaymentUseCase {
         );
       }
 
-      const escrowStatus =
-        asaasPayment.escrow?.status ??
-        (payment.splitConfig ? 'ACTIVE' : 'NONE');
+      // Split direto por padrão (D+0). Escrow atua apenas se a subconta/cobrança possuir garantia ativa no Asaas
+      const escrowStatus = asaasPayment.escrow?.status ?? 'NONE';
 
       // 5. Atualiza o pagamento local com dados completos
       await this.paymentRepository.update(payment.id, {

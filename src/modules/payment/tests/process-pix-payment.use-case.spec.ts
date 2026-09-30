@@ -238,6 +238,110 @@ describe('ProcessPixPaymentUseCase', () => {
     );
   });
 
+  it('should default escrowStatus to NONE for direct split when Asaas does not return escrow', async () => {
+    const splitConfig = JSON.stringify([
+      { walletId: 'wallet_direct_1', fixedValue: 50.0 },
+    ]);
+
+    const payment = {
+      id: 'pay_split_direct',
+      customerId: 'cust_direct',
+      value: 100.0,
+      dueDate: null,
+      externalReference: 'order_direct_1',
+      splitConfig,
+    };
+
+    const customer = {
+      id: 'cust_direct',
+      externalId: 'ext_cust_direct',
+      asaasCustomerId: 'cus_asaas_direct',
+    };
+
+    paymentRepositoryMock.findById.mockResolvedValue(payment);
+    customerRepositoryMock.findById.mockResolvedValue(customer);
+
+    asaasClientMock.post.mockResolvedValue({
+      id: 'pay_asaas_direct_1',
+      status: 'PENDING',
+    });
+    asaasClientMock.get.mockResolvedValue({});
+
+    await useCase.execute({ paymentId: 'pay_split_direct' });
+
+    expect(paymentRepositoryMock.update).toHaveBeenCalledWith(
+      'pay_split_direct',
+      expect.objectContaining({
+        escrowStatus: 'NONE',
+      }),
+    );
+  });
+
+  it('should fail validation when fixed split value exceeds payment value', async () => {
+    const splitConfig = JSON.stringify([
+      { walletId: 'wallet_overflow', fixedValue: 250.0 },
+    ]);
+
+    const payment = {
+      id: 'pay_split_overflow',
+      customerId: 'cust_overflow',
+      value: 200.0,
+      dueDate: null,
+      splitConfig,
+    };
+
+    const customer = {
+      id: 'cust_overflow',
+      externalId: 'ext_cust_overflow',
+      asaasCustomerId: 'cus_asaas_overflow',
+    };
+
+    paymentRepositoryMock.findById.mockResolvedValue(payment);
+    customerRepositoryMock.findById.mockResolvedValue(customer);
+
+    await useCase.execute({ paymentId: 'pay_split_overflow' });
+
+    expect(paymentRepositoryMock.updateStatus).toHaveBeenCalledWith(
+      'pay_split_overflow',
+      'FAILED',
+      expect.stringContaining('não pode exceder o valor total da cobrança'),
+    );
+    expect(asaasClientMock.post).not.toHaveBeenCalled();
+  });
+
+  it('should fail validation when subaccountExternalId cannot be resolved to walletId', async () => {
+    const splitConfig = JSON.stringify([
+      { subaccountExternalId: 'unresolved_sub', fixedValue: 50.0 },
+    ]);
+
+    const payment = {
+      id: 'pay_split_unresolved',
+      customerId: 'cust_unresolved',
+      value: 100.0,
+      dueDate: null,
+      splitConfig,
+    };
+
+    const customer = {
+      id: 'cust_unresolved',
+      externalId: 'ext_cust_unresolved',
+      asaasCustomerId: 'cus_asaas_unresolved',
+    };
+
+    paymentRepositoryMock.findById.mockResolvedValue(payment);
+    customerRepositoryMock.findById.mockResolvedValue(customer);
+    subaccountRepositoryMock.findByExternalId.mockResolvedValue(null);
+
+    await useCase.execute({ paymentId: 'pay_split_unresolved' });
+
+    expect(paymentRepositoryMock.updateStatus).toHaveBeenCalledWith(
+      'pay_split_unresolved',
+      'FAILED',
+      expect.stringContaining('não possui walletId ativo para split'),
+    );
+    expect(asaasClientMock.post).not.toHaveBeenCalled();
+  });
+
   it('should mark payment as FAILED without rethrowing when Asaas returns AsaasBadRequestException', async () => {
     const payment = {
       id: 'pay_3',

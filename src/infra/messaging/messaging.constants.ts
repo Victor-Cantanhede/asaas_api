@@ -13,6 +13,7 @@ export const EVENT_PATTERNS = {
   SUBSCRIPTION_UPDATE_CARD: 'subscription.update_card',
   SUBSCRIPTION_CANCEL: 'subscription.cancel',
   SUBACCOUNT_CREATE: 'subaccount.create',
+  SUBACCOUNT_TRANSFER: 'subaccount.transfer',
   PAYMENT_RELEASE_ESCROW: 'payment.release_escrow',
   WEBHOOK_RECEIVED: 'webhook.received',
   WEBHOOK_FORWARD_TO_CLIENT: 'webhook.forward_to_client',

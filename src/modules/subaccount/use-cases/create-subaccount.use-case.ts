@@ -1,4 +1,4 @@
-import { Injectable, Inject, Logger } from '@nestjs/common';
+import { Injectable, Inject, Logger, Optional } from '@nestjs/common';
 import {
   SUBACCOUNT_REPOSITORY_TOKEN,
   ISubaccountRepository,
@@ -10,6 +10,7 @@ import {
   IEventPublisher,
 } from '../../../infra/messaging/contracts/event-publisher.interface';
 import { EVENT_PATTERNS } from '../../../infra/messaging/messaging.constants';
+import { CardEncryptionService } from '../../../infra/security/card-encryption.service';
 
 export interface CreateSubaccountInput {
   subaccountId: string;
@@ -26,6 +27,8 @@ export class CreateSubaccountUseCase {
     private readonly asaasClient: AsaasClientProvider,
     @Inject(EVENT_PUBLISHER_TOKEN)
     private readonly eventPublisher: IEventPublisher,
+    @Optional()
+    private readonly cardEncryptionService?: CardEncryptionService,
   ) {}
 
   async execute(input: CreateSubaccountInput): Promise<void> {
@@ -38,6 +41,7 @@ export class CreateSubaccountUseCase {
     try {
       let asaasAccountId = subaccount.asaasAccountId;
       let walletId = subaccount.walletId;
+      let subaccountApiKey: string | null = subaccount.apiKey ?? null;
 
       const cleanCpfCnpj = subaccount.cpfCnpj.replace(/\D/g, '');
 
@@ -51,6 +55,11 @@ export class CreateSubaccountUseCase {
           const existing = searchResult.data[0];
           asaasAccountId = existing.id;
           walletId = existing.walletId;
+          if (existing.apiKey) {
+            subaccountApiKey = this.cardEncryptionService
+              ? this.cardEncryptionService.encryptText(existing.apiKey)
+              : existing.apiKey;
+          }
         }
       }
 
@@ -75,6 +84,12 @@ export class CreateSubaccountUseCase {
         const createdAccount = await this.asaasClient.post<any>('/v3/accounts', payload);
         asaasAccountId = createdAccount.id;
         walletId = createdAccount.walletId;
+
+        if (createdAccount.apiKey) {
+          subaccountApiKey = this.cardEncryptionService
+            ? this.cardEncryptionService.encryptText(createdAccount.apiKey)
+            : createdAccount.apiKey;
+        }
       }
 
       // 3. Se Escrow estiver habilitado, configura garantia de custódia na subconta
@@ -94,10 +109,11 @@ export class CreateSubaccountUseCase {
         }
       }
 
-      // 4. Salva a subconta sincronizada no banco local
+      // 4. Salva a subconta sincronizada no banco local com a apiKey cifrada
       await this.subaccountRepository.updateSynced(subaccount.id, {
         asaasAccountId: asaasAccountId!,
         walletId: walletId!,
+        apiKey: subaccountApiKey,
         escrowEnabled: subaccount.escrowEnabled,
         escrowDaysToExpire: subaccount.escrowDaysToExpire,
       });

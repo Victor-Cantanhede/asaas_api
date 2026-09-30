@@ -82,12 +82,15 @@ describe('CreateSubaccountUseCase', () => {
       '/v3/accounts/acc_asaas_1/escrow',
       { enabled: true, daysToExpire: 30 },
     );
-    expect(repository.updateSynced).toHaveBeenCalledWith('subacc_1', {
-      asaasAccountId: 'acc_asaas_1',
-      walletId: 'wal_asaas_1',
-      escrowEnabled: true,
-      escrowDaysToExpire: 30,
-    });
+    expect(repository.updateSynced).toHaveBeenCalledWith(
+      'subacc_1',
+      expect.objectContaining({
+        asaasAccountId: 'acc_asaas_1',
+        walletId: 'wal_asaas_1',
+        escrowEnabled: true,
+        escrowDaysToExpire: 30,
+      }),
+    );
     expect(eventPublisher.publish).toHaveBeenCalledWith(
       'webhook.forward_to_client',
       expect.objectContaining({
@@ -144,6 +147,25 @@ describe('CreateSubaccountUseCase', () => {
       'subacc_1',
       'FAILED',
       expect.any(String),
+    );
+  });
+
+  it('deve criptografar e persistir apiKey retornada na criação da subconta', async () => {
+    asaasClient.post.mockResolvedValueOnce({
+      id: 'acc_asaas_key',
+      walletId: 'wal_asaas_key',
+      apiKey: '$aact_subaccount_secret_token_123',
+    });
+
+    await useCase.execute({ subaccountId: 'subacc_1', externalId: 'ext_1' });
+
+    expect(repository.updateSynced).toHaveBeenCalledWith(
+      'subacc_1',
+      expect.objectContaining({
+        asaasAccountId: 'acc_asaas_key',
+        walletId: 'wal_asaas_key',
+        apiKey: expect.any(String),
+      }),
     );
   });
 });

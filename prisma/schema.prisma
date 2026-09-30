@@ -105,6 +105,7 @@ model Subaccount {
   externalId          String   @unique @map("external_id")
   asaasAccountId      String?  @unique @map("asaas_account_id")
   walletId            String?  @unique @map("wallet_id")
+  apiKey              String?  @map("api_key")
   name                String
   email               String
   cpfCnpj             String   @map("cpf_cnpj")

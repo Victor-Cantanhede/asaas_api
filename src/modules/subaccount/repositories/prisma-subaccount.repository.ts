@@ -71,6 +71,7 @@ export class PrismaSubaccountRepository implements ISubaccountRepository {
     data: {
       asaasAccountId: string;
       walletId: string;
+      apiKey?: string | null;
       escrowEnabled: boolean;
       escrowDaysToExpire?: number | null;
     },
@@ -80,6 +81,7 @@ export class PrismaSubaccountRepository implements ISubaccountRepository {
       data: {
         asaasAccountId: data.asaasAccountId,
         walletId: data.walletId,
+        ...(data.apiKey !== undefined ? { apiKey: data.apiKey } : {}),
         escrowEnabled: data.escrowEnabled,
         escrowDaysToExpire: data.escrowDaysToExpire ?? null,
         status: 'SYNCED',

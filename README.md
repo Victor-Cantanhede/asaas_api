@@ -287,6 +287,119 @@ curl -X POST http://localhost:5006/webhooks/asaas \
 ```
 *Resposta: `HTTP 200 OK` em menos de 10ms.*
 
+> ⚠️ **Configuração Obrigatória no Painel Asaas**:  
+> No portal do Asaas (**Configurações da Conta ➔ Integrações ➔ Webhooks**), configure a URL apontando para `https://<seu-dominio>/webhooks/asaas`, defina a versão da API como `v3` e insira o segredo no campo **Token de Autenticação** com o mesmo valor da variável `ASAAS_WEBHOOK_SECRET` do `.env`.  
+> Veja o checklist detalhado de flags no tópico [Configuração de Webhooks no Painel Asaas](#-configuração-de-webhooks-no-painel-asaas-checklist-de-flags) abaixo.
+
+---
+
+### 8. Criar Subconta Asaas (`POST /subaccounts`)
+```bash
+curl -X POST http://localhost:5006/subaccounts \
+  -H "Content-Type: application/json" \
+  -H "x-api-key: local_api_key_secret_123" \
+  -d '{
+    "name": "Barbearia Vintage Ltda",
+    "email": "financeiro@barbeariavintage.com.br",
+    "cpfCnpj": "12345678000195",
+    "birthDate": "1990-05-15",
+    "companyType": "LIMITED",
+    "phone": "11988887777",
+    "postalCode": "01310-000",
+    "address": "Avenida Paulista",
+    "addressNumber": "1000"
+  }'
+```
+*Resposta: `HTTP 202 Accepted` com `trackingId` e `checkStatusUrl: /subaccounts/:id`.*
+
+---
+
+### 9. Transferência / Saque Manual de Subconta (`POST /subaccounts/:id/transfers`)
+
+> **Política de Custódia e Saques**: As subcontas não efetuam saques por conta própria no portal do Asaas. A movimentação para contas bancárias externas ou chaves PIX de parceiros é gerida e acionada exclusivamente pela conta-mãe (esta API). A API Key da subconta é armazenada de forma segura com criptografia **AES-256-GCM** e utilizada para autenticar a operação de transferência.
+
+#### Saque via Chave PIX:
+```bash
+curl -X POST http://localhost:5006/subaccounts/sub_c1a2b3.../transfers \
+  -H "Content-Type: application/json" \
+  -H "x-api-key: local_api_key_secret_123" \
+  -d '{
+    "value": 150.00,
+    "operationType": "PIX",
+    "pixAddressKey": "12345678000195",
+    "pixAddressKeyType": "CNPJ",
+    "description": "Repasse quinzenal parceiro"
+  }'
+```
+
+#### Saque via TED / Conta Bancária:
+```bash
+curl -X POST http://localhost:5006/subaccounts/sub_c1a2b3.../transfers \
+  -H "Content-Type: application/json" \
+  -H "x-api-key: local_api_key_secret_123" \
+  -d '{
+    "value": 500.00,
+    "operationType": "TED",
+    "bankAccount": {
+      "bank": { "code": "260" },
+      "ownerName": "Barbearia Vintage Ltda",
+      "cpfCnpj": "12345678000195",
+      "agency": "0001",
+      "account": "1234567",
+      "accountDigit": "8",
+      "bankAccountType": "CONTA_CORRENTE"
+    }
+  }'
+```
+*Resposta: `HTTP 202 Accepted`.*
+
+---
+
+## 💡 Mecânica Financeira: Split de Pagamentos vs. Custódia (Escrow)
+
+1. **Split Direto (D+0 Imediato por Padrão)**:
+   - Em cobranças com split (ex: PIX ou Cartão), o valor direcionado a cada `walletId` é creditado **imediatamente na confirmação do pagamento** no saldo Asaas da subconta recebedora.
+   - **Não é necessária nenhuma chamada subsequente** para liberação dos fundos na subconta.
+   - A conta-mãe absorve a taxa Asaas por padrão em splits de valor fixo (`fixedValue`), garantindo previsibilidade financeira para o parceiro. Validações preventivas asseguram que a soma dos splits fixos nunca exceda o valor total da cobrança.
+
+2. **Garantia de Custódia (Escrow - Opcional e Explícito)**:
+   - Apenas aplicável se a subconta tiver custódia ativada explicitamente no gateway (`escrow: { enabled: true }`).
+   - Nesse cenário, o saldo permanece retido até a data de expiração contratual ou liberação manual antecipada pela conta-mãe via rota oficial Asaas `POST /v3/escrow/{id}/finish`.
+
+3. **Saque para o Mundo Externo**:
+   - Os recursos splitados que repousam no saldo Asaas da subconta só saem para contas bancárias externas ou chaves PIX mediante ordem disparada pela conta-mãe via `POST /subaccounts/:id/transfers`.
+
+---
+
+## 🪝 Configuração de Webhooks no Painel Asaas (Checklist de Flags)
+
+Para que a API receba as atualizações em tempo real e realize a conciliação assíncrona com perfeição, configure a URL e selecione as seguintes flags no portal do Asaas (**Configurações da Conta ➔ Integrações ➔ Webhooks**):
+
+### Parâmetros de Conexão:
+- **URL do Webhook**: `https://<seu-dominio-ou-cloudflared-tunnel>/webhooks/asaas`
+- **Versão da API**: `v3`
+- **Token de Autenticação**: Informe o mesmo valor definido em `ASAAS_WEBHOOK_SECRET` no arquivo `.env`.
+
+### Matriz de Flags Recomendadas:
+
+| Fila / Seção | Evento (Flag) | Status | Função no Gateway |
+| :--- | :--- | :--- | :--- |
+| **Cobranças** | `PAYMENT_CREATED` | **Obrigatório** | Notifica registro de nova cobrança |
+| **Cobranças** | `PAYMENT_UPDATED` | **Obrigatório** | Notifica alteração de dados da cobrança |
+| **Cobranças** | `PAYMENT_CONFIRMED` | **Obrigatório** | Confirmação de pagamento com cartão |
+| **Cobranças** | `PAYMENT_RECEIVED` | **Obrigatório** | Confirmação e **liquidação D+0** do pagamento e do split |
+| **Cobranças** | `PAYMENT_REFUNDED` | **Obrigatório** | Estorno de pagamento efetuado |
+| **Cobranças** | `PAYMENT_OVERDUE` | **Obrigatório** | Vencimento expirado sem pagamento |
+| **Cobranças** | `PAYMENT_DELETED` | **Obrigatório** | Cancelamento / remoção de cobrança |
+| **Custódia** | `ESCROW_FINISHED` | Se usar Escrow | Encerramento / liberação de garantia em custódia |
+| **Transferências** | `TRANSFER_DONE` | **Recomendado** | Notifica liquidação e sucesso do saque da subconta |
+| **Transferências** | `TRANSFER_FAILED` | **Recomendado** | Notifica falha / rejeição bancária do saque com motivo (`failReason`) |
+| **Transferências** | `TRANSFER_CANCELLED` | Opcional | Notifica cancelamento de transferência |
+| **Divergências** | `PAYMENT_SPLIT_DIVERGENCE_BLOCK` | Recomendado | Emite alerta nos logs caso haja divergência nos splits |
+| **Assinaturas** | `SUBSCRIPTION_CREATED` | Se usar recorrência | Criação de assinatura |
+| **Assinaturas** | `SUBSCRIPTION_UPDATED` | Se usar recorrência | Atualização de assinatura |
+| **Assinaturas** | `SUBSCRIPTION_DELETED` | Se usar recorrência | Cancelamento de assinatura |
+
 ---
 
 ## 🧪 Testes Automatizados & Qualidade de Código
@@ -316,6 +429,7 @@ Cada módulo do sistema possui documentação técnica dedicada e formalizada:
 - [src/modules/customer/spec.md](./src/modules/customer/spec.md) — Módulo de Clientes e evento `customer.sync`.
 - [src/modules/payment/spec.md](./src/modules/payment/spec.md) — Módulo de Cobranças PIX, Cartão de Crédito e Split.
 - [src/modules/subscription/spec.md](./src/modules/subscription/spec.md) — Ciclo de vida de assinaturas e recorrência.
+- [src/modules/subaccount/spec.md](./src/modules/subaccount/spec.md) — Subcontas White-label, armazenamento seguro de API Key e Transferências/Saques.
 - [src/modules/webhook/spec.md](./src/modules/webhook/spec.md) — Ingestão de webhooks <10ms, idempotência e repasse.
 
 ---
@@ -326,3 +440,4 @@ Cada módulo do sistema possui documentação técnica dedicada e formalizada:
 > Todas as alterações de schema devem ser versionadas em migrations no diretório `prisma/migrations/`:
 > - `npx prisma migrate dev --name <nome_da_alteracao>` (Ambiente de desenvolvimento)
 > - `npx prisma migrate deploy` (Produção / Docker / CI)
+

@@ -20,20 +20,31 @@ export class PaymentSplitDto {
   @IsSafeText()
   subaccountExternalId?: string;
 
-  @ApiPropertyOptional({ description: 'Valor fixo repassado à carteira', example: 30.0 })
+  @ApiPropertyOptional({
+    description:
+      'Valor fixo repassado à carteira (líquido para a subconta; a tarifa do gateway é absorvida pela conta principal)',
+    example: 30.0,
+  })
   @IsOptional()
   @IsNumber()
   @IsPositive()
   fixedValue?: number;
 
-  @ApiPropertyOptional({ description: 'Percentual sobre a cobrança (0.01 a 100)', example: 10.0 })
+  @ApiPropertyOptional({
+    description:
+      'Percentual sobre o valor líquido da cobrança (0.01 a 100). Calculado após desconto das taxas do Asaas',
+    example: 10.0,
+  })
   @IsOptional()
   @IsNumber()
   @Min(0.01)
   @Max(100)
   percentualValue?: number;
 
-  @ApiPropertyOptional({ description: 'Descrição interna do split', example: 'Comissão Parceiro' })
+  @ApiPropertyOptional({
+    description: 'Descrição interna do split para identificação do repasse',
+    example: 'Comissão Parceiro',
+  })
   @IsOptional()
   @IsString()
   @IsSafeText()

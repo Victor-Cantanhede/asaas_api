@@ -79,9 +79,10 @@ Contudo, no NestJS:
 
 ### 6.3. Idempotência e Geração de Fallback do `eventId`
 - O Asaas envia identificadores únicos de evento como `evt_d26e303b...&20598710`.
-- Para payloads legados ou omissos, o sistema aplica fallback determinístico:
-  `evt_${payload.payment?.id || payload.subscription?.id || 'gen'}_${payload.event}_${Date.now()}`
-- Duplicatas são descartadas sem mutações no banco (`isDuplicate: true`) e sem disparo de repasse reverso.
+- Para payloads que omitam o campo `id`, o sistema aplica fallback determinístico baseado em identificadores da entidade e data de criação:
+  `evt_${payload.payment?.id || payload.subscription?.id || payload.transfer?.id || 'gen'}_${payload.event}_${dateCreated}`
+- Elimina o uso de `Date.now()` para assegurar que retentativas idênticas do gateway sejam estritamente descartadas como duplicatas (`isDuplicate: true`) sem reprocessamento no banco e sem reenvio ao backend consumidor.
+- Normalização de status: eventos `PAYMENT_RECEIVED` e `PAYMENT_CONFIRMED` atualizam a entidade local sempre para o status `CONFIRMED`, eliminando ambiguidades com o status inicial de enfileiramento `RECEIVED`.
 
 ### 6.4. Segurança e Tempo Constante (`timingSafeEqual`)
 - O `AsaasWebhookAuthGuard` extrai `asaas-access-token` e compara com `ASAAS_WEBHOOK_SECRET` em memória através de `crypto.timingSafeEqual` sobre buffers de bytes.
@@ -106,6 +107,9 @@ O ciclo de vida do webhook possui instrumentação de logging em todas as camada
 | `ProcessAsaasWebhookUseCase` | `LOG` | Registro bruto criado na tabela de auditoria `webhook_events` |
 | `ProcessAsaasWebhookUseCase` | `LOG` | Pagamento/Assinatura local atualizado com novos dados |
 | `ProcessAsaasWebhookUseCase` | `WARN` | Cobrança ou Assinatura recebida no webhook não localizada no banco local |
+| `ProcessAsaasWebhookUseCase` | `LOG` | `[TRANSFERÊNCIA CONCLUÍDA]` Saque de subconta efetivado (valor, tipo PIX/TED, data) |
+| `ProcessAsaasWebhookUseCase` | `WARN` | `[TRANSFERÊNCIA FALHOU]` Saque rejeitado com o motivo explícito retornado pelo Asaas (`failReason`) |
+| `ProcessAsaasWebhookUseCase` | `WARN` | `[ALERTA DE DIVERGÊNCIA DE SPLIT]` Divergência em divisão de split para auditoria financeira |
 | `ProcessAsaasWebhookUseCase` | `LOG` | `WebhookEvent` marcado como processado com sucesso |
 | `WebhookForwarderConsumer` | `LOG` | Início do disparo HTTP POST para `CLIENT_WEBHOOK_URL` |
 | `WebhookForwarderConsumer` | `LOG` | Repasse concluído com sucesso (`HTTP 200`) |
@@ -118,6 +122,43 @@ O ciclo de vida do webhook possui instrumentação de logging em todas as camada
 - `tests/webhook.controller.spec.ts`: Retorno de HTTP 200 em < 10ms, publicação em `webhook.received` e suporte a payloads com nós `account` e `split`.
 - `tests/webhook.consumer.spec.ts`: Idempotência estrita, descarte de duplicatas e emissão de `webhook.forward_to_client`.
 - `tests/webhook-forwarder.consumer.spec.ts`: Repasse assinado com `x-webhook-secret` e tratamento de erros com/sem método `.text()`.
-- `tests/process-asaas-webhook.use-case.spec.ts`: Atualização de pagamentos, assinaturas, custódia (escrow) e persistência em `WebhookEvent`.
+- `tests/process-asaas-webhook.use-case.spec.ts`: Atualização de pagamentos, assinaturas, custódia (escrow), conciliação de transferências (`TRANSFER_DONE`, `TRANSFER_FAILED`), divergências de split e persistência em `WebhookEvent`.
+
+---
+
+## 9. 📋 Guia de Configuração de Webhooks no Painel do Asaas
+
+Para que o gateway receba as notificações em tempo real, o desenvolvedor deve configurar as seguintes opções no painel administrativo do Asaas:
+
+### 9.1. Onde Configurar
+Acesse: **Configurações da Conta** ➔ **Integrações** ➔ **Webhooks**.
+
+1. **URL do Webhook**: `https://<seu-dominio-ou-cloudflared-tunnel>/webhooks/asaas`
+2. **Versão da API**: `v3`
+3. **E-mail para Notificação em caso de Erro**: Insira o e-mail da equipe técnica.
+4. **Token de Autenticação**: Informe exatamente o valor definido na variável de ambiente `ASAAS_WEBHOOK_SECRET` do arquivo `.env`.
+
+### 9.2. Checklist de Flags por Fila de Notificação
+
+| Fila / Seção no Painel Asaas | Evento (Flag) | Obrigatoriedade | Propósito no Gateway |
+| :--- | :--- | :--- | :--- |
+| **Cobranças** | `PAYMENT_CREATED` | Obrigatório | Notifica a geração da cobrança no gateway |
+| **Cobranças** | `PAYMENT_UPDATED` | Obrigatório | Notifica atualização de vencimento/valor |
+| **Cobranças** | `PAYMENT_CONFIRMED` | Obrigatório | Notifica confirmação de pagamento (ex: Cartão) |
+| **Cobranças** | `PAYMENT_RECEIVED` | Obrigatório | **Liquidação D+0** do pagamento e do Split no Asaas |
+| **Cobranças** | `PAYMENT_REFUNDED` | Obrigatório | Notifica estorno do pagamento |
+| **Cobranças** | `PAYMENT_OVERDUE` | Obrigatório | Notifica vencimento da cobrança sem pagamento |
+| **Cobranças** | `PAYMENT_DELETED` | Obrigatório | Notifica exclusão da cobrança |
+| **Custódia** | `ESCROW_FINISHED` | Se usar Escrow | Notifica liberação de custódia (`escrowStatus = 'FINISHED'`) |
+| **Transferências** | `TRANSFER_DONE` | **Recomendado** | Notifica que o saque bancário/PIX da subconta compensou com sucesso |
+| **Transferências** | `TRANSFER_FAILED` | **Recomendado** | Notifica que o saque da subconta falhou (chave PIX inválida, conta rejeitada) |
+| **Transferências** | `TRANSFER_CANCELLED` | Opcional | Notifica cancelamento de saque agendado |
+| **Transferências** | `TRANSFER_IN_BANK_PROCESSING` | Opcional | Acompanhamento do processamento bancário da TED/PIX |
+| **Divergências de Split** | `PAYMENT_SPLIT_DIVERGENCE_BLOCK` | Recomendado | Emite alerta nos logs caso haja inconsistência de split |
+| **Divergências de Split** | `PAYMENT_SPLIT_DIVERGENCE_BLOCK_FINISHED` | Recomendado | Notifica o fim da divergência de split |
+| **Assinaturas** | `SUBSCRIPTION_CREATED` | Se usar recorrência | Notifica criação da assinatura |
+| **Assinaturas** | `SUBSCRIPTION_UPDATED` | Se usar recorrência | Notifica alteração de plano/cartão |
+| **Assinaturas** | `SUBSCRIPTION_DELETED` | Se usar recorrência | Notifica cancelamento da assinatura |
+
 
 

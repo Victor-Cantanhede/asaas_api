@@ -54,7 +54,8 @@ export class CreatePixPaymentDto {
   externalReference?: string;
 
   @ApiPropertyOptional({
-    description: 'Regras de split de pagamento',
+    description:
+      'Regras de split de pagamento (creditadas automaticamente em D+0 no saldo da subconta no momento da confirmação do PIX; retenção em custódia ocorre apenas se a subconta tiver Escrow ativado)',
     type: [PaymentSplitDto],
   })
   @IsOptional()

@@ -70,22 +70,24 @@ O `PaymentModule` gerencia o ciclo de vida completo de cobranças financeiras av
 ## 5. ⚙️ Casos de Uso & Regras de Negócio
 - **`ProcessPixPaymentUseCase`**:
   1. Localiza o pagamento e garante sincronização do cliente (`asaasCustomerId`).
-  2. Resolve itens de split: se fornecido `subaccountExternalId`, mapeia para `walletId` via `ISubaccountRepository`.
-  3. Submete `POST /v3/payments` com `billingType: 'PIX'`.
+  2. Resolve itens de split com validação preventiva: se fornecido `subaccountExternalId`, mapeia para `walletId` via `ISubaccountRepository`. Rejeita se o `walletId` não for encontrado ou se a soma dos splits fixos/percentuais ultrapassar os limites da cobrança.
+  3. Submete `POST /v3/payments` com `billingType: 'PIX'` e regras de split.
   4. Consulta `GET /v3/payments/:id/pixQrCode` para obter imagem e payload copia-e-cola.
-  5. Atualiza registro para `PENDING` com dados do QR Code e status de `escrowStatus`.
+  5. Define `escrowStatus`: por padrão assume `'NONE'`, pois o split no Asaas é direto e liquidado automaticamente em **D+0** no saldo da subconta. Caso a subconta possua garantia de custódia ativada, herda o status `'ACTIVE'` retornado pelo gateway.
+  6. Atualiza registro para `PENDING` com dados do QR Code e status de `escrowStatus`.
 - **`ProcessCreditCardPaymentUseCase`**:
   1. Localiza pagamento e sincroniza cliente.
-  2. Resolve split por `subaccountExternalId` se aplicável.
+  2. Resolve split por `subaccountExternalId` se aplicável com validação preventiva.
   3. Se informado `creditCardToken`, utiliza débito tokenizado diretamente.
   4. Se informados dados do cartão (descriptografados pelo consumer), envia `creditCard` e `creditCardHolderInfo`.
   5. Calcula parcelamento se `installmentCount > 1`.
   6. Envia `remoteIp` para o antifraude do Asaas.
-  7. Ao receber confirmação do Asaas, atualiza status para `CONFIRMED`, persiste dados do cartão/token e `escrowStatus`.
-  8. Publica notificação em `webhook.forward_to_client`.
+  7. Define `escrowStatus` como `'NONE'` por padrão (ou o status real do Asaas se a subconta tiver Escrow habilitado).
+  8. Ao receber confirmação do Asaas, atualiza status para `CONFIRMED`, persiste dados do cartão/token e `escrowStatus`.
+  9. Publica notificação em `webhook.forward_to_client`.
 - **`ProcessReleaseEscrowUseCase`**:
   1. Localiza cobrança polimorficamente por UUID local ou `externalReference`.
-  2. Invoca endpoint oficial do Asaas `POST /v3/payments/{id}/escrow` para liberar a retenção de valores.
+  2. Invoca endpoint oficial do Asaas `POST /v3/escrow/{id}/finish` para encerrar a garantia de custódia e liberar os valores retidos na subconta.
   3. Atualiza `escrowStatus` para `FINISHED` e grava `escrowFinishDate`.
   4. Publica notificação com evento `ESCROW_RELEASED` no RabbitMQ para encaminhamento ao cliente via webhook.
 - **`GetPaymentUseCase`**: Consulta síncrona com lançamento de `NotFoundException`.

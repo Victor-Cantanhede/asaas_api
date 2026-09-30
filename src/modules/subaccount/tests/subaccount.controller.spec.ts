@@ -19,6 +19,8 @@ describe('SubaccountController', () => {
         status: 'RECEIVED',
         createdAt: new Date('2026-09-17T12:00:00.000Z'),
       }),
+      findById: jest.fn(),
+      findByExternalId: jest.fn(),
     };
 
     eventPublisher = {
@@ -94,6 +96,40 @@ describe('SubaccountController', () => {
 
       expect(getSubaccountUseCase.execute).toHaveBeenCalledWith('freelancer_1');
       expect(result.walletId).toBe('wal_abc');
+    });
+  });
+
+  describe('POST /subaccounts/:id/transfers', () => {
+    it('deve enfileirar transferência e retornar 202 Accepted', async () => {
+      const dto = {
+        value: 120.0,
+        pixAddressKey: 'carlos@pix.com',
+        pixAddressKeyType: 'EMAIL' as const,
+      };
+
+      repository.findById.mockResolvedValue({
+        id: 'subacc_123',
+        externalId: 'freelancer_1',
+      });
+
+      const result = await controller.transferSubaccount('subacc_123', dto);
+
+      expect(eventPublisher.publish).toHaveBeenCalledWith('subaccount.transfer', {
+        subaccountId: 'subacc_123',
+        transferData: dto,
+      });
+      expect(result.trackingId).toBe('subacc_123');
+      expect(result.status).toBe('PROCESSING');
+      expect(result.checkStatusUrl).toBe('/subaccounts/freelancer_1');
+    });
+
+    it('deve lançar NotFoundException caso a subconta não exista', async () => {
+      repository.findById.mockResolvedValue(null);
+      repository.findByExternalId.mockResolvedValue(null);
+
+      await expect(
+        controller.transferSubaccount('inexistente', { value: 100 }),
+      ).rejects.toThrow();
     });
   });
 });

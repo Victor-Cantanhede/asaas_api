@@ -20,36 +20,33 @@ export class CardEncryptionService {
   }
 
   /**
-   * Criptografa os dados sensíveis do cartão de crédito (PAN e CVV) usando AES-256-GCM.
-   * Garante conformidade com os requisitos 3 e 4 do PCI-DSS para trânsito no broker de mensageria.
+   * Criptografa uma string de texto usando AES-256-GCM.
    * Formato retornado: iv:authTag:ciphertext (em Base64).
    */
-  encrypt(card: CreditCardDto): string {
-    if (!card) {
+  encryptText(plaintext: string): string {
+    if (!plaintext) {
       return '';
     }
 
-    // IV de 12 bytes (96 bits) recomendado pelo NIST para AES-GCM
     const iv = randomBytes(12);
     const cipher = createCipheriv(this.algorithm, this.key, iv);
 
-    const plaintext = JSON.stringify(card);
     const encrypted = Buffer.concat([
       cipher.update(plaintext, 'utf8'),
       cipher.final(),
     ]);
 
-    const authTag = cipher.getAuthTag(); // 16 bytes (128 bits)
+    const authTag = cipher.getAuthTag();
 
     return `${iv.toString('base64')}:${authTag.toString('base64')}:${encrypted.toString('base64')}`;
   }
 
   /**
-   * Descriptografa o envelope seguro contendo os dados do cartão de crédito.
+   * Descriptografa uma string protegida por AES-256-GCM.
    */
-  decrypt(encryptedEnvelope: string): CreditCardDto {
+  decryptText(encryptedEnvelope: string): string {
     if (!encryptedEnvelope) {
-      throw new Error('Envelope criptografado de cartão não fornecido');
+      throw new Error('Envelope criptografado não fornecido');
     }
 
     const parts = encryptedEnvelope.split(':');
@@ -69,7 +66,29 @@ export class CardEncryptionService {
       decipher.final(),
     ]);
 
-    return JSON.parse(decrypted.toString('utf8')) as CreditCardDto;
+    return decrypted.toString('utf8');
+  }
+
+  /**
+   * Criptografa os dados sensíveis do cartão de crédito (PAN e CVV) usando AES-256-GCM.
+   * Garante conformidade com os requisitos 3 e 4 do PCI-DSS para trânsito no broker de mensageria.
+   */
+  encrypt(card: CreditCardDto): string {
+    if (!card) {
+      return '';
+    }
+    return this.encryptText(JSON.stringify(card));
+  }
+
+  /**
+   * Descriptografa o envelope seguro contendo os dados do cartão de crédito.
+   */
+  decrypt(encryptedEnvelope: string): CreditCardDto {
+    if (!encryptedEnvelope) {
+      throw new Error('Envelope criptografado de cartão não fornecido');
+    }
+    const jsonStr = this.decryptText(encryptedEnvelope);
+    return JSON.parse(jsonStr) as CreditCardDto;
   }
 
   /**

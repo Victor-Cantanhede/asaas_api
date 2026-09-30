@@ -73,7 +73,7 @@ describe('ProcessReleaseEscrowUseCase', () => {
     await useCase.execute(input);
 
     expect(paymentRepositoryMock.findById).toHaveBeenCalledWith('pay_uuid_1');
-    expect(asaasClientMock.post).toHaveBeenCalledWith('/v3/payments/pay_asaas_123/escrow', {});
+    expect(asaasClientMock.post).toHaveBeenCalledWith('/v3/escrow/pay_asaas_123/finish', {});
     expect(paymentRepositoryMock.update).toHaveBeenCalledWith('pay_uuid_1', {
       escrowStatus: 'FINISHED',
       escrowFinishDate: new Date(finishDateStr),
@@ -135,7 +135,7 @@ describe('ProcessReleaseEscrowUseCase', () => {
 
     expect(paymentRepositoryMock.findById).toHaveBeenCalledWith('ext_order_200');
     expect(paymentRepositoryMock.findByExternalReference).toHaveBeenCalledWith('ext_order_200');
-    expect(asaasClientMock.post).toHaveBeenCalledWith('/v3/payments/pay_asaas_456/escrow', {});
+    expect(asaasClientMock.post).toHaveBeenCalledWith('/v3/escrow/pay_asaas_456/finish', {});
     expect(paymentRepositoryMock.update).toHaveBeenCalledWith(
       'pay_uuid_2',
       expect.objectContaining({

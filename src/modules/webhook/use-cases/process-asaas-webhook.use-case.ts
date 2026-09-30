@@ -33,7 +33,10 @@ export class ProcessAsaasWebhookUseCase {
   ) {}
 
   async execute(payload: AsaasWebhookPayloadDto): Promise<ProcessWebhookResult> {
-    const eventId = payload.id || `evt_${payload.payment?.id || payload.subscription?.id || 'gen'}_${payload.event}_${Date.now()}`;
+    const entityId =
+      payload.payment?.id || payload.subscription?.id || payload.transfer?.id || 'gen';
+    const dateStr = payload.dateCreated ? payload.dateCreated.replace(/[\s:]+/g, '_') : 'nodate';
+    const eventId = payload.id || `evt_${entityId}_${payload.event}_${dateStr}`;
     const existing = await this.webhookEventRepository.findByEventId(eventId);
     if (existing) {
       this.logger.warn(`[ProcessAsaasWebhookUseCase] Evento ${eventId} já recebido anteriormente (descarte idempotente).`);
@@ -59,12 +62,13 @@ export class ProcessAsaasWebhookUseCase {
         if (payment) {
           const updateData: Record<string, any> = {};
 
-          if (payload.payment?.status) {
-            updateData.status = payload.payment.status;
-          } else if (payload.event === 'PAYMENT_CONFIRMED' || payload.event === 'PAYMENT_RECEIVED') {
+          if (payload.event === 'PAYMENT_CONFIRMED' || payload.event === 'PAYMENT_RECEIVED') {
             updateData.status = 'CONFIRMED';
           } else if (payload.event === 'PAYMENT_REFUNDED') {
             updateData.status = 'REFUNDED';
+          } else if (payload.payment?.status) {
+            updateData.status =
+              payload.payment.status === 'RECEIVED' ? 'CONFIRMED' : payload.payment.status;
           }
 
           if (payload.payment?.netValue !== undefined) {
@@ -119,6 +123,42 @@ export class ProcessAsaasWebhookUseCase {
             `[ProcessAsaasWebhookUseCase] Assinatura Asaas "${payload.subscription.id}" recebida no evento ${payload.event}, mas nenhuma assinatura local correspondente foi localizada.`,
           );
         }
+      }
+
+      // 3. Registro e Observabilidade de Transferências (Saques da Subconta)
+      if (payload.transfer || payload.event.startsWith('TRANSFER_')) {
+        const transfer = payload.transfer;
+        const transferId = transfer?.id || entityId;
+        const opType = transfer?.operationType || 'TRANSFER';
+        const val =
+          transfer?.value !== undefined ? `R$ ${Number(transfer.value).toFixed(2)}` : 'N/A';
+        const netVal =
+          transfer?.netValue !== undefined ? `R$ ${Number(transfer.netValue).toFixed(2)}` : 'N/A';
+
+        if (payload.event === 'TRANSFER_DONE') {
+          this.logger.log(
+            `[ProcessAsaasWebhookUseCase] [TRANSFERÊNCIA CONCLUÍDA] Saque ${transferId} efetivado com sucesso. Valor: ${val} (Líquido: ${netVal}) | Tipo: ${opType} | Data: ${transfer?.effectiveDate || transfer?.dateCreated || 'N/A'}.`,
+          );
+        } else if (payload.event === 'TRANSFER_FAILED') {
+          this.logger.warn(
+            `[ProcessAsaasWebhookUseCase] [TRANSFERÊNCIA FALHOU] Saque ${transferId} rejeitado pelo banco de destino. Motivo: "${transfer?.failReason || 'Falha não especificada'}" | Valor: ${val} | Tipo: ${opType}.`,
+          );
+        } else if (payload.event === 'TRANSFER_CANCELLED') {
+          this.logger.warn(
+            `[ProcessAsaasWebhookUseCase] [TRANSFERÊNCIA CANCELADA] Saque ${transferId} foi cancelado. Valor: ${val} | Motivo: "${transfer?.failReason || 'Cancelado pelo operador ou gateway'}".`,
+          );
+        } else {
+          this.logger.log(
+            `[ProcessAsaasWebhookUseCase] [TRANSFERÊNCIA ATUALIZADA] Evento ${payload.event} para transferência ${transferId}. Status: ${transfer?.status || 'N/A'} | Valor: ${val}.`,
+          );
+        }
+      }
+
+      // 4. Registro e Alerta de Divergências de Split
+      if (payload.event.includes('SPLIT_DIVERGENCE')) {
+        this.logger.warn(
+          `[ProcessAsaasWebhookUseCase] [ALERTA DE DIVERGÊNCIA DE SPLIT] Evento "${payload.event}" recebido para entidade "${entityId}". Verifique no portal Asaas a divisão de saldo desta transação.`,
+        );
       }
 
       await this.webhookEventRepository.markProcessed(webhookEvent.id);

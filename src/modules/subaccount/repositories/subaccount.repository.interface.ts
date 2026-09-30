@@ -13,6 +13,7 @@ export interface ISubaccountRepository {
     data: {
       asaasAccountId: string;
       walletId: string;
+      apiKey?: string | null;
       escrowEnabled: boolean;
       escrowDaysToExpire?: number | null;
     },

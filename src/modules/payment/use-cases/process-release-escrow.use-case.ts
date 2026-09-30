@@ -76,23 +76,13 @@ export class ProcessReleaseEscrowUseCase {
       }
 
       // 2. Chamada oficial Asaas para finalizar garantia (POST /v3/escrow/{id}/finish)
-      if (escrowId) {
-        const finishResult = await this.asaasClient.post<any>(
-          `/v3/escrow/${escrowId}/finish`,
-          {},
-        );
-        if (finishResult?.finishDate) {
-          finishDate = new Date(finishResult.finishDate);
-        }
-      } else {
-        // Fallback direto por cobrança caso o ID da garantia não tenha sido obtido
-        const finishResult = await this.asaasClient.post<any>(
-          `/v3/payments/${payment.asaasPaymentId}/escrow`,
-          {},
-        );
-        if (finishResult?.finishDate) {
-          finishDate = new Date(finishResult.finishDate);
-        }
+      const targetEscrowId = escrowId || payment.asaasPaymentId;
+      const finishResult = await this.asaasClient.post<any>(
+        `/v3/escrow/${targetEscrowId}/finish`,
+        {},
+      );
+      if (finishResult?.finishDate) {
+        finishDate = new Date(finishResult.finishDate);
       }
 
       await this.paymentRepository.update(payment.id, {

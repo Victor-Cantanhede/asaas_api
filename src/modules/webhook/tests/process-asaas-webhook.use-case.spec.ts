@@ -152,4 +152,76 @@ describe('ProcessAsaasWebhookUseCase', () => {
       }),
     );
   });
+
+  it('should process TRANSFER_DONE webhook event, infer transfer entityId and mark processed', async () => {
+    webhookEventRepoMock.findByEventId.mockResolvedValue(null);
+
+    const payload = {
+      event: 'TRANSFER_DONE',
+      dateCreated: '2026-09-30 14:00:00',
+      transfer: {
+        id: 'trans_asaas_123',
+        status: 'DONE',
+        value: 150.0,
+        netValue: 145.0,
+        operationType: 'PIX',
+        effectiveDate: '2026-09-30',
+      },
+    };
+
+    const result = await useCase.execute(payload as any);
+
+    expect(result.isDuplicate).toBe(false);
+    expect(webhookEventRepoMock.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        eventId: 'evt_trans_asaas_123_TRANSFER_DONE_2026-09-30_14_00_00',
+        event: 'TRANSFER_DONE',
+      }),
+    );
+    expect(webhookEventRepoMock.markProcessed).toHaveBeenCalledWith('wh_evt_1');
+  });
+
+  it('should process TRANSFER_FAILED webhook event with failReason and mark processed', async () => {
+    webhookEventRepoMock.findByEventId.mockResolvedValue(null);
+
+    const payload = {
+      id: 'evt_trans_fail_1',
+      event: 'TRANSFER_FAILED',
+      transfer: {
+        id: 'trans_asaas_999',
+        status: 'FAILED',
+        value: 50.0,
+        operationType: 'TED',
+        failReason: 'Chave PIX ou agência/conta inexistente no banco destino',
+      },
+    };
+
+    const result = await useCase.execute(payload as any);
+
+    expect(result.isDuplicate).toBe(false);
+    expect(webhookEventRepoMock.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        eventId: 'evt_trans_fail_1',
+        event: 'TRANSFER_FAILED',
+      }),
+    );
+    expect(webhookEventRepoMock.markProcessed).toHaveBeenCalledWith('wh_evt_1');
+  });
+
+  it('should process PAYMENT_SPLIT_DIVERGENCE_BLOCK event gracefully and mark processed', async () => {
+    webhookEventRepoMock.findByEventId.mockResolvedValue(null);
+
+    const payload = {
+      id: 'evt_split_div_1',
+      event: 'PAYMENT_SPLIT_DIVERGENCE_BLOCK',
+      payment: {
+        id: 'pay_asaas_split_div',
+      },
+    };
+
+    const result = await useCase.execute(payload as any);
+
+    expect(result.isDuplicate).toBe(false);
+    expect(webhookEventRepoMock.markProcessed).toHaveBeenCalledWith('wh_evt_1');
+  });
 });

@@ -10,6 +10,7 @@ import {
 export interface AsaasRequestOptions {
   headers?: Record<string, string>;
   params?: Record<string, any>;
+  customApiKey?: string;
 }
 
 @Injectable()
@@ -34,26 +35,26 @@ export class AsaasClientProvider {
     return this.baseUrl;
   }
 
-  async get<T = any>(path: string, params?: Record<string, any>): Promise<T> {
-    return this.request<T>('GET', path, { params });
+  async get<T = any>(path: string, params?: Record<string, any>, options?: AsaasRequestOptions): Promise<T> {
+    return this.request<T>('GET', path, { params, ...options });
   }
 
-  async post<T = any>(path: string, body?: any): Promise<T> {
-    return this.request<T>('POST', path, { body });
+  async post<T = any>(path: string, body?: any, options?: AsaasRequestOptions): Promise<T> {
+    return this.request<T>('POST', path, { body, ...options });
   }
 
-  async put<T = any>(path: string, body?: any): Promise<T> {
-    return this.request<T>('PUT', path, { body });
+  async put<T = any>(path: string, body?: any, options?: AsaasRequestOptions): Promise<T> {
+    return this.request<T>('PUT', path, { body, ...options });
   }
 
-  async delete<T = any>(path: string): Promise<T> {
-    return this.request<T>('DELETE', path);
+  async delete<T = any>(path: string, options?: AsaasRequestOptions): Promise<T> {
+    return this.request<T>('DELETE', path, options);
   }
 
   private async request<T = any>(
     method: string,
     path: string,
-    options: { body?: any; params?: Record<string, any> } = {},
+    options: { body?: any; params?: Record<string, any>; headers?: Record<string, string>; customApiKey?: string } = {},
   ): Promise<T> {
     const cleanPath = path.startsWith('/') ? path : `/${path}`;
     const url = new URL(`${this.baseUrl}${cleanPath}`);
@@ -67,9 +68,10 @@ export class AsaasClientProvider {
     }
 
     const headers: Record<string, string> = {
-      access_token: this.apiKey,
+      access_token: options.customApiKey || this.apiKey,
       'Content-Type': 'application/json',
       Accept: 'application/json',
+      ...(options.headers || {}),
     };
 
     const fetchOptions: RequestInit = {
