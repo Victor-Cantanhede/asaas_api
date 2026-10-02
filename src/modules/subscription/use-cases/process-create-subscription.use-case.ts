@@ -99,7 +99,13 @@ export class ProcessCreateSubscriptionUseCase {
       if (input.creditCardToken) {
         payload.creditCardToken = input.creditCardToken;
       } else if (input.creditCard) {
-        payload.creditCard = input.creditCard;
+        payload.creditCard = {
+          ...input.creditCard,
+          number:
+            typeof input.creditCard.number === 'string'
+              ? input.creditCard.number.replace(/[\s.-]+/g, '')
+              : input.creditCard.number,
+        };
         if (input.creditCardHolderInfo) {
           payload.creditCardHolderInfo = input.creditCardHolderInfo;
         }
